@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __PDCSERVER_HPP_
-#define __PDCSERVER_HPP_
+#ifndef __PDCCLIENT_HPP
+#define __PDCCLIENT_HPP
 
 //#include "type.h"
 //#include "shmmem.hpp"
@@ -18,15 +18,26 @@ using namespace std;
 using namespace shmMem;
 using namespace pdcPipe;
 
+typedef void*  pdc_rados_ioctx_t;
+typedef void*  pdc_rados_t;
+typedef void*  pdc_rbd_image_t;
+
+
+
 class PdcClient :public Center{
     string clientname;
     Perfs perf;
     Time time;
     pid_t pid;
     int threadnum;
+    int autokey;
+    int ref;
+public:
     map<int  , ThreadType >theads;
+    //PdcPipe<PdcOp> pdc
     PdcPipe<Msginfo> msgmq;
-    map<map<string, string>, PdcPipe<Msginfo>* > ackmq;
+    PdcPipe<Msginfo>::ptr ackmq;
+    //map<map<string, string>, PdcPipe<Msginfo>* > ackmq;
     //list<PdcOp> queue_io;
     list<Msginfo> queue_ms;
     Perfs *performace;
@@ -36,39 +47,42 @@ class PdcClient :public Center{
 public:
     class Iothreads :public Threadpool{
         string desc;
-        Pdcserver *server;
+        PdcClient *pc; //pdcclient
     public:
-        Iothreads(string desc_, Pdcserver *& _client):desc(desc_),server(_server) {};
-        ~Iothreads() {};
+        Iothreads(string desc_, PdcClient *_pc):
+			desc(desc_),pc(_pc) {}
+        ~Iothreads() {}
         
         int do_op(void * m);
-        virtual void *_process(void * arg);
+        virtual void *_process();
     };
 	
     class Finisherthreads :public Threadpool{
         string desc;
-        Pdcserver *server;
+        PdcClient *pc;
     public:
-        Finisherthreads(string desc_,Pdcserver *& _server):desc(desc_),server(_server) {};
-        ~Finisherthreads() {};
-        virtual void* _process(void* arg);
+        Finisherthreads(string desc_, PdcClient * _pc):
+			desc(desc_),pc(_pc) {}
+        ~Finisherthreads() {}
+        virtual void* _process();
     };	
     class Msgthreads :public Threadpool{
         string desc;
-        Pdcserver *server;
+        PdcClient *pc;
     public:
-        Msgthreads(string desc_, Pdcserver *&_server):desc(desc_), server(_server){};
-        Msgthreads() {};
-        virtual void *_process(void * arg);
+        Msgthreads(string desc_, PdcClient *_pc):
+			desc(desc_), pc(_pc) {}
+        ~Msgthreads() {}
+        virtual void *_process();
     };
 
 public:
     pthread_mutex_t iomutex;
-    list<PdcOp *> ops;
+    list<Msginfo *> ops;
     Iothreads  *iothread;
 
     pthread_mutex_t finimutex;
-    list<PdcOp *> finishop;
+    list<Msginfo *> finishop;
     Finisherthreads *finisher;
 
     pthread_mutex_t msgmutex;
@@ -77,25 +91,47 @@ public:
     
     
 public:
-    Pdcserver(string nm): perf(),time(),servername(nm),pid(-1),threadnum(2),
-        msgmq(PIPEKEY, MEMQSEM, PIPEREAD, pdcPipe::SYS_t::PIPESERVER),
+    PdcClient(string nm): 
+        perf(),time(),clientname(nm),pid(-1),threadnum(2),
+        //autokey(250),  //pipe key start from 250
+        msgmq(PIPEKEY, MEMQSEM, PIPEWRITE, PIPECLIENT),
+        ackmq(NULL),
         performace(NULL),
         iothread(NULL), msgthread(NULL), finisher(NULL),
-        slab(MEMKEY, SERVERCREATE)
-        {pid = getpid();
+        slab(MEMKEY, SERVERCREATE),
+        ref(0)
+        {
+            pid = getpid();
             time.reset();
+            //PdcClient do not need reset mq keys:
+            ref++;
+            //string key;
+            //key = PIPEKEYHEAD + 
+            //msgmq.ResetPipeKey();
         }
-    ~Pdcserver();
-    void do_work(Pdcserver *server);
+    ~PdcClient() {};
+    /*
+    PdcClient * operator=(const PdcClient *& pclient){
+        PdcClient *tmp = this;
+        this = pclient;
+        pclient = tmp;
+        return this;
+    }
+    */
+    bool has_ackmq() {return ackmq != NULL;}
+    void do_work(PdcClient *pc);
     int init();
-    void OpFindClient(PdcOp *&op);
-    int register_vm(map<string,string > &client);
-    int unregister();
+    void inc_ref() {ref ++;}
+    void OpFindClient(Msginfo *&op);
 
 
 	
 };
 
+
+
+
+extern PdcClient *pdc_client_mgr;
 
 
 #endif

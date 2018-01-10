@@ -1,0 +1,33 @@
+#######################
+# Makefile
+#######################
+# source object target
+SOURCE := pdcserver.cpp backend_ceph.cpp pipe.cpp
+OBJS   := pdcserver.o backend_ceph.o pipi.o
+TARGET := pdcserver
+
+# compile and lib parameter
+CC      := g++
+LIBS    := -lpthread -lrbd -lrados
+LDFLAGS := -L.
+DEFINES :=
+INCLUDE := -I.
+CFLAGS  := 
+CXXFLAGS:= 
+PATH 	:='./obj/'
+# link parameter
+LIB	:= libpdc.so
+
+# link
+(LIB):pdc.o
+    $(CC) -shared  -o -fPIC -o $(PATH)$@ $^
+
+# compile
+#$(OBJS):$(SOURCE)
+pdc.o:backend_ceph.o pip.cpp
+    $(CC) -c -fPIC -o $(PATH)$@
+
+# clean
+clean:
+    rm -fr $(PATH)*.o
+    rm -fr $(PATH)$(TARGET)

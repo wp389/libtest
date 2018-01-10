@@ -19,11 +19,11 @@
 #define PIPEREAD   2
 
 #define PIPEMSGSIZE 8192
-
+#define SENDMQ "send"
+#define RECVMQ "recv"
 using namespace std;
 //namespace wp {
 namespace pdcPipe {
-
 
 class SemLock {
 public:
@@ -118,7 +118,9 @@ public:
 
 		static const uint32_t SHMSIZE = 1024*1024*16+24;
 //测试将大小调小，实际使用时应该设大避免影响性能
-
+//PIPECLIENT need init keys, and than sync this keys to pdcserver. 
+//update them to the same key
+// 
 
              typedef enum{
                  PIPECLIENT,
@@ -127,13 +129,23 @@ public:
     template<typename T>
     class PdcPipe {
     public:
+        explicit PdcPipe(SYS_t systype):
+            m_key(""),m_model(0),semkey(-1),s_type(systype),
+        fd(-1){
+            if(systype == PIPECLIENT)
+            m_model = O_WRONLY|O_NONBLOCK;  //|O_NONBLOCK
+            if(systype == PIPESERVER)
+            m_model = O_RDONLY|O_NONBLOCK;
+            //m_key
+        }		
         explicit PdcPipe(const char *  key, int semk,int type, SYS_t systype):
             m_key(key),m_model(0),m_type(type),semkey(semk),s_type(systype),
         fd(-1){
             if(systype == PIPECLIENT)
-            m_model = O_WRONLY;  //|O_NONBLOCK
+            m_model = O_WRONLY|O_NONBLOCK;  //|O_NONBLOCK
             if(systype == PIPESERVER)
-            m_model = O_RDONLY;
+            m_model = O_RDONLY|O_NONBLOCK;
+            //m_key
         }
 
         ~PdcPipe() {
@@ -155,17 +167,27 @@ public:
 	                               }
 					}
 				}
-				if(0){
+				if(s_type == PIPESERVER){
                                  fd = ::open(m_key.c_str(), m_model);
 					if(fd < 0 ){
 					    cerr<<"open :"<<m_key<<"failed "<<endl; 
 					    return -1; 
 	                           }
 				}
-				
-				return fd;
+                          t = new T();
+				assert(t);
+				return 0;
 			}
-                    int Getkey() {return m_key;}
+                    int ResetPipeKey(string newkey){
+                        m_key.swap(newkey);
+                        return 0;
+                    };
+                    int ResetSemKey(int newkey){
+                         semkey = newkey; 
+                         return 0;
+                    }
+                    string Getkeys() {return m_key;}
+                    int GetSemKey() {return semkey;}
 			int GetFd() {return fd;}
 			bool isEmpty() {
 
@@ -191,13 +213,14 @@ public:
                         return 0;
 			}
 			int  push(T *& a){
-                        int r;
+                        int r = 0;
                         //semLockGuard oLock(m_Sem);
                         if(openpipe() < 0 ) return -1;
                         if (isFull()) {
                           return -1;
                         }
-                        r = ::write(fd, &a, sizeof(T));
+                        r = ::write(fd, a, sizeof(T));
+                        cerr<<" pipe push size:"<<r<<endl;
                         if(r != sizeof(T))
                             return -1;
 						
@@ -212,16 +235,17 @@ public:
                             return NULL;//应该选择抛出异常等方式，待改进；
                         }
                         //T *t = new T();
-			    while(r  <= 0)		
-                            r = ::read(fd, t ,sizeof(T));  //block
+			    //while(r  <= 0)		
+                        r = ::read(fd, t ,sizeof(T));  //block
 				
-                        if(r == sizeof(T))
+                        if(r == sizeof(T)){
                             return t;
+                        }
                         else
                             return NULL;
 			}
 			
-
+                    void clear() { memset(t,0,sizeof(T));}
 			std::string GetErrMsg() {
 				return m_sErrMsg;
 			}
@@ -238,8 +262,15 @@ public:
 			std::string m_sErrMsg;
 		};
 
+	
+	extern int createclientqueues(map<string ,void *> &mqs,bool sw);
+	
+	extern int createserverqueues(map<string,string>&pipekeys, map<string,int>semkeys,map<string ,void *> &mqs);
 
 	}
+
+
+
 //}
 
 #endif 

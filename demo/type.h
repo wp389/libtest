@@ -11,30 +11,43 @@
 #include <list>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <pthread.h>
 #include <errno.h>
 #include <assert.h>
+#include <unistd.h>
+#include <malloc.h>
 
 #define LOCALTEST 1
 //#include "pipe.hpp"
 typedef unsigned long long u64;
 typedef unsigned long u32;
 
+extern u64 msgid;
+extern u64 opid;
+
+/*  for all client shm keys is a range 
+     from 250 to 1024.
+     server default is 123
+*/
 #define MEMKEY 123
 #define PIPEKEY "/tmp/FIFO"
-#define MEMSEM 12
+#define PIPESEMKEY 249
+#define MEMSEM 23
 #define MEMQSEM 45
 
+#define PIPEKEYHEAD "Pipe."
 #define SLABSIZE 1024*1024*16+256
 #define MEMQSIZE 1024*1024*4
 
+#define CLIENTSTARTPIPEKEY 251
+#define SERVERSTARTPIPEKEY 25001
 
 #define NAMELENTH 64
 #define SERVERCREATE 1
 using namespace std;
 //using namespace wp::Pipe;
 //using namespace pdcPipe::PdcPipe;
-
 
 
 typedef enum{
@@ -48,6 +61,8 @@ struct simpledata{
     char data[4096];
 };
 struct pdcdata{
+    void * c;
+    u64 offset;
     int len;
     list<u64> indexlist;
 
@@ -109,6 +124,7 @@ public:
         return 0;
     }
     void start(){
+        cerr<<"start thread:<<" <<name<<endl;
         _stop = false;
     }
     	
@@ -146,11 +162,17 @@ public:
 };
 
 typedef enum {
-    OPEN_RBD = 0xa,
+    OPEN_RADOS = 0xa,
+    OPEN_RBD,
+    PDC_AIO_WRITE,
+    PDC_AIO_READ,
     GET_MEMORY,
     ACK_MEMORY,
     RW_OP,
     MGR_OP,
+    RW_FINISH,
+    RW_W_FINISH,
+    RW_R_FINISH,
     
 
 }PdcIomachine;
@@ -211,12 +233,65 @@ struct PdcClientInfo{
 };
 
 struct  Msginfo{
+    bool sw;
+    u64 opid;
     pid_t pid;
-    PdcIomachine op;
+    pid_t remote_pid;
+    map<string , int >mqkeys;
+    map<string , string >pipekeys;
+    map<string ,int>semkeys;
+    PdcIomachine opcode;  //opcode
+    
     PdcClientInfo client;
     pdcdata data;
+    const void * originbuf;
+    void * op;
+    void * volume;
+    int return_code;
+	
+    Msginfo():sw(true),remote_pid(0),return_code(-1) {pid = getpid(); opid = ++msgid;};
+    Msginfo & operator =(const Msginfo*&m){
+        if(this != m){
+            //this->mqkeys.swap(m->mqkeys);
+            this->opcode = m->opcode;
+            this->client = m->client;
+            this->data = m->data;
+            this->op = m->op;
+            this->remote_pid = m->pid;
+            //memset(m , 0 ,);
+        }
+        return *this;
+    }
+    void dump(const char *f =NULL){
+        if(!sw) return;
+		
+        cerr<<"msginfo: ";
+        if(f)
+        cerr<<f;
+        cerr<<endl;
+        cerr<<" opid = "<<opid;
+        cerr<<" ,pid ="<<pid;
+        cerr<<" ,op = "<<opcode;
+        cerr<<" ,client.pool ="<<client.pool;
+        cerr<<" ,client.rbd ="<<client.volume;
+        cerr<<" ,client.pipekey ="<<client.pipekey;
+        cerr<<" ,offset ="<<client.offset;
+        cerr<<" ,len ="<<client.len<<endl;
+    }
+    void insert_op(void *p_op){
+        op = p_op;
+    }
+    void * pop_op(){
+        return (void *)op;
+    }
+    void insert_volume(void *p_v){
+        volume = p_v;
+    }
+    void * pop_volume(){
+        return (void *)volume;
+    }
+    int getreturnvalue() {return return_code;}
     
-    	
 };
 
 class Center{
@@ -227,16 +302,39 @@ public:
 };
 
 
-
+/*
 struct PdcOp{
-    u64 op_idx;
+    u64 opidx;
     pid_t pid;
+    PdcIomachine op;
     pdcdata data;
     PdcClientInfo client;
-    void *volume;
+    u64 volume;
+    char *originbuf;
     int ret;
+    bool sw;
 public:
-    PdcOp() {};
-    
+    PdcOp():sw(true) {pid=getpid(); opidx = ++opid;};
+    void insert_volume(void *p_v){
+        volume = p_v;
+    }
+
+    void dump(){
+        if(!sw) return;
+        cerr<<"op info:"<<endl;
+        cerr<<"opid = "<<opidx;
+        cerr<<" ,pid ="<<pid;
+        cerr<<" ,op = "<<op;
+        cerr<<" ,client.pool ="<<client.pool;
+        cerr<<" ,client.rbd ="<<client.volume;
+        cerr<<" ,client.pipekey ="<<client.pipekey;
+        cerr<<" ,offset ="<<data.offset;
+	cerr<<" ,len ="<<data.len<<endl;
+}
+
 };
+*/
+
+
+
 

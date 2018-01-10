@@ -26,6 +26,7 @@ class Pdcserver :public Center{
     int threadnum;
     map<int  , ThreadType >theads;
     PdcPipe<Msginfo> msgmq;
+    
     map<map<string, string>, PdcPipe<Msginfo>* > ackmq;
     //list<PdcOp> queue_io;
     list<Msginfo> queue_ms;
@@ -38,8 +39,7 @@ public:
         string desc;
         Pdcserver *server;
     public:
-        Iothreads(string desc_, 
-        Pdcserver *_server):desc(desc_),server(_server),Threadpool() {};
+        Iothreads(string desc_, Pdcserver *_server):desc(desc_),server(_server),Threadpool() {}
         ~Iothreads() {};
         
         int do_op(void * m);
@@ -67,11 +67,11 @@ public:
 
 public:
     pthread_mutex_t iomutex;
-    list<PdcOp *> ops;
+    list<Msginfo *> ops;
     Iothreads  *iothread;
 
     pthread_mutex_t finimutex;
-    list<PdcOp *> finishop;
+    list<Msginfo *> finishop;
     Finisherthreads *finisher;
 
     pthread_mutex_t msgmutex;
@@ -81,7 +81,7 @@ public:
     
 public:
     Pdcserver(string nm): perf(),time(),servername(nm),pid(-1),threadnum(2),
-        msgmq(PIPEKEY, MEMQSEM, PIPEREAD, pdcPipe::PIPESERVER),
+        msgmq(PIPEKEY, PIPESEMKEY, PIPEREAD, PIPESERVER),
         performace(NULL),
         iothread(NULL), msgthread(NULL), finisher(NULL),
         slab(MEMKEY, SERVERCREATE)
@@ -91,10 +91,10 @@ public:
     ~Pdcserver();
     void do_work(Pdcserver *server);
     int init();
-    void OpFindClient(PdcOp *&op);
-    int register_vm(map<string,string > &client);
+    void OpFindClient(Msginfo *&op);
+    int register_vm(map<string,string > &client, Msginfo *msg);
     int unregister();
-
+    int register_connection(Msginfo* msg);
 
 	
 };

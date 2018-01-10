@@ -1,0 +1,27 @@
+In file included from libpdc.cpp:3:
+./type.h:19:10: fatal error: 'malloc.h' file not found
+#include <malloc.h>
+         ^
+1 error generated.
+In file included from pdcclient.cpp:6:
+In file included from ./pdcclient.hpp:8:
+In file included from ./backend_ceph.hpp:5:
+./type.h:19:10: fatal error: 'malloc.h' file not found
+#include <malloc.h>
+         ^
+1 error generated.
+In file included from backend_ceph.cpp:4:
+./type.h:19:10: fatal error: 'malloc.h' file not found
+#include <malloc.h>
+         ^
+1 error generated.
+In file included from pipe.cpp:3:
+./type.h:19:10: fatal error: 'malloc.h' file not found
+#include <malloc.h>
+         ^
+1 error generated.
+In file included from type.cc:4:
+./type.h:19:10: fatal error: 'malloc.h' file not found
+#include <malloc.h>
+         ^
+1 error generated.

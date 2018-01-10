@@ -28,7 +28,7 @@ void* Pdcserver::Iothreads::_process()
             pthread_mutex_unlock(&pdc->iomutex);
             continue;
         }
-        PdcOp *op = pdc->ops.front();
+        Msginfo *op = pdc->ops.front();
         vol = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
         if(vol){
             cerr<<"get NULL volume"<<endl; 
@@ -36,6 +36,7 @@ void* Pdcserver::Iothreads::_process()
         }
         pdc->ops.pop_front();
         pthread_mutex_unlock(&pdc->iomutex);
+        op->dump("server io tp op");
         list<u64>::iterator itm = op->data.indexlist.begin();
         for(;itm != op->data.indexlist.end();itm++){
             //memset(op->data.pdata, 6, op->data.len);
@@ -44,8 +45,9 @@ void* Pdcserver::Iothreads::_process()
             r = do_op(pdata);
         }
         //TODO: here ,we connect rados  and write rbd
-        op->ret = 0;
-        cerr<<"do io:"<< vol->Getname() <<endl;
+        op->return_code = 0;
+        if(op->opcode == PDC_AIO_WRITE) op->opcode =  RW_W_FINISH;
+        cerr<<"do io:"<< vol->GetName() <<endl;
         pthread_mutex_lock(&pdc->finimutex);
         pdc->finishop.push_back(op);
         pthread_mutex_unlock(&pdc->finimutex);
@@ -58,8 +60,11 @@ void* Pdcserver::Iothreads::_process()
 
 void* Pdcserver::Finisherthreads::_process()
 {
+    int r;
+    u64 sum = 0;
     Pdcserver *pdc = (Pdcserver *)server;
-
+    CephBackend::RbdVolume *prbd;
+    pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
     cerr<<"Fnisher thread "<<pthread_self()<<" start"<<endl;
     
     while(1){
@@ -70,16 +75,25 @@ void* Pdcserver::Finisherthreads::_process()
             pthread_mutex_unlock(&pdc->finimutex);
             continue;
         }
-        PdcOp *op = pdc->ops.front();
+        Msginfo *op = pdc->ops.front();
         pdc->finishop.pop_front();
         pthread_mutex_unlock(&pdc->finimutex);
-
-
-       //free shared memory
-        
+        op->dump("server finish tp op");
+        //cerr<<" get a finish op ,do pop"<<endl;
+        op->return_code = 0;
+        //free shared memory
+        prbd = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
         //TODO: here ,we connect rados  and write rbd
-        
-        
+        op->return_code = 0;
+
+        p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >(prbd->mq[SENDMQ]);
+        r = p_pipe->push(op);
+        sum++;
+        if(r < 0){
+            cerr<<"done op id:"<<sum<<" failed"<<endl;
+	     continue;
+        }
+		
     }
 
 return 0;
@@ -91,14 +105,14 @@ void* Pdcserver::Msgthreads::_process()
 {
     int r;
     Pdcserver *pdc = (Pdcserver *)server;
-    cerr<<"IOthread "<<pthread_self()<<" start"<<endl;
+    cerr<<"MSGthread "<<pthread_self()<<" start"<<endl;
 
     while(1){
         if(stop() ) continue;
         Msginfo *msg = pdc->msgmq.pop();
         if(!msg){
-            cerr<<"msg thread get NULL msg"<<endl;;
-            assert(0);
+            ///cerr<<"msg thread get NULL msg"<<endl;;
+            //assert(0);
             continue;
         }
         //performace->perf
@@ -106,17 +120,22 @@ void* Pdcserver::Msgthreads::_process()
         //r = do_op(msg);
         if(msg){
             assert(msg);
+            msg->dump("server msg tp op");
             std::map<string,string> client;
-            assert(msg->client.cluster == "ceph");
+            //assert(msg->client.cluster == "ceph");
             client[msg->client.pool] = msg->client.volume;
             //perf.inc();
-            if(msg->op == OPEN_RBD){
-                r = pdc->register_vm(client);
+            if(msg->opcode == OPEN_RADOS){
+                pdc->register_connection(msg);
+
+
+            }else if(msg->opcode == OPEN_RBD){
+                r = pdc->register_vm(client, msg);
                 if(r < 0){
                     cerr<<"register vm failed ret = "<<r <<endl;
                     continue;
                 }
-            }else if(msg->op == GET_MEMORY){
+            }else if(msg->opcode == GET_MEMORY){
                 list<u64> listadd ;
                 
                 r = pdc->slab.get(msg->client.len, listadd);
@@ -124,7 +143,7 @@ void* Pdcserver::Msgthreads::_process()
                     cerr<<"get memory failed"<<endl;
                     continue;
                 }
-                msg->op = ACK_MEMORY;
+                msg->opcode = ACK_MEMORY;
                 msg->data.indexlist.swap(listadd);
                 pdcPipe::PdcPipe<Msginfo>::ptr pipe;
 
@@ -135,17 +154,19 @@ void* Pdcserver::Msgthreads::_process()
                     cerr<<"pipe push msg:"<<msg<<" failed"<<endl;
                     continue;
                 }
-            }else if(msg->op == RW_OP){
+            }else if(msg->opcode == PDC_AIO_WRITE){
+                /*
                 PdcOp *op = new PdcOp(); 
                 op->data.len = msg->data.len;
                 op->data.indexlist.swap(msg->data.indexlist);
                 op->client = msg->client;
                 op->pid = msg->pid; // client pid;
-                pdc->OpFindClient(op);
+                */
+                pdc->OpFindClient(msg);
                 pthread_mutex_lock(&pdc->msgmutex);
-                server->ops.push_back(op);
+                server->ops.push_back(msg);
                 pthread_mutex_unlock(&pdc->msgmutex);
-
+                
             }
 
 
@@ -169,7 +190,9 @@ int Pdcserver::init()
     pthread_t id;
     string state("init: ");
     cerr<<state<<"start thread:"<<endl;
-
+    
+    CephBackend* pceph = new CephBackend("ceph","/etc/ceph/ceph.conf");
+    clusters["ceph"] = pceph;
     //slab = new wp::shmMem::shmMem(MEMKEY, SERVERCREATE);
     ret = slab.Init();
     if(ret < 0){
@@ -179,7 +202,7 @@ int Pdcserver::init()
     //msgmq = new wp::Pipe::Pipe(PIPEKEY, MEMQSEM, PIPEREAD,wp::Pipe::SYS_t::PIPESERVER);
     ret = msgmq.Init();
     if(ret < 0){
-        cerr<<"slab init faled:"<<ret<<endl;
+        cerr<<"msgmq init faled:"<<ret<<endl;
     }
     pthread_mutex_init(&iomutex,NULL);
     iothread = new Pdcserver::Iothreads("IO-threadpool", this);
@@ -205,8 +228,16 @@ int Pdcserver::init()
     return 0;
 }
 
+int Pdcserver::register_connection(Msginfo* msg)
+{
+    //msg->dump();
+    cerr<<"msg to register pipe connection"<<endl;
 
-int Pdcserver::register_vm(map<string,string > &client)
+    return 0;
+
+}
+
+int Pdcserver::register_vm(map<string,string > &client, Msginfo *msg)
 {
     CephBackend *cephcluster ;
     string nm("ceph");
@@ -220,12 +251,13 @@ int Pdcserver::register_vm(map<string,string > &client)
         cephcluster= new CephBackend(nm,"/etc/ceph/ceph.conf");
         clusters[nm] = cephcluster;
     }
-    cephcluster->register_client(client);
+    cerr<<"register vm:"<<client<<endl;
+    cephcluster->register_client(client,msg);
 
 return 0;
 }
 
-void Pdcserver::OpFindClient(PdcOp *&op)
+void Pdcserver::OpFindClient(Msginfo *&op)
 {
     string pool(op->client.pool);
     string volume(op->client.volume);
@@ -240,7 +272,7 @@ void Pdcserver::OpFindClient(PdcOp *&op)
     }
     op->volume =  backend->findclient( &opclient);
     assert(op->volume);
-
+    
 }
 
 
@@ -256,8 +288,11 @@ int main()
         cerr<<"server init failed"<<endl;
         return -1;
     }
-
-    sleep(1000000);  
+    r = 0;
+    while(1){
+       r++;
+	sleep(1);
+    }
     
     return 0;
 }
