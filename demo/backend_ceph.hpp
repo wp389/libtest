@@ -81,7 +81,7 @@ public:
             rbdname(nm),rados(_rados)
             //pipe(rbdname.c_str(), 12, PIPEWRITE, PIPECLIENT) 
             {}
-        ~RbdVolume() {}
+        ~RbdVolume() {}  //todo close pipe
         int init();
         const char * GetName() {return rbdname.c_str();}
         int aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t cb);

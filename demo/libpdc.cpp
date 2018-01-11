@@ -59,10 +59,9 @@ int pdc_rados_ioctx_create(pdc_rados_t vmclient, const char *pool_name,
     strcpy(msg->client.cluster,"ceph");
     strcpy(msg->client.pool,pool_name);
     
-    msg->pipekeys[SENDMQ] = pclient->msgmq.Getkeys();  
-    msg->pipekeys[RECVMQ] = pclient->ackmq->Getkeys();
-    msg->semkeys[SENDMQ] = pclient->msgmq.GetSemKey();  
-    msg->semkeys[RECVMQ] = pclient->ackmq->GetSemKey();
+
+    strcpy(msg->mqkeys.key , pclient->ackmq->Getkeys());
+    msg->mqkeys.semkey= pclient->ackmq->GetSemKey();
     msg->dump("open rados");
     r = pclient->msgmq.push(msg);
     if(r<  0 ){
@@ -121,7 +120,8 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
         *image = (void *)prbd;
         prados->volumes[rbdname] = (void *)prbd;
     }
-    
+
+    pdcPipe::PdcPipe<Msginfo>::ptr recvmq = prbd->mq[RECVMQ];
     //msginfo will change to msgpool list  next step
     Msginfo *msg = new Msginfo();
     msg->opcode = OPEN_RBD;
@@ -129,6 +129,9 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
     strcpy(msg->client.cluster,"ceph");
     strcpy(msg->client.pool, prados->GetName());
     strcpy(msg->client.volume,rbd_name);
+    strcpy(msg->mqkeys.key,recvmq->Getkeys());
+    msg->mqkeys.semkey = recvmq->GetSemKey();
+
     msg->dump("open rbd");
     
     r = pdcclient->msgmq.push(msg);

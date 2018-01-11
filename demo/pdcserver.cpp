@@ -193,6 +193,8 @@ int Pdcserver::init()
     
     CephBackend* pceph = new CephBackend("ceph","/etc/ceph/ceph.conf");
     clusters["ceph"] = pceph;
+    pceph->radoses.clear();
+    pceph->vols.clear();
     //slab = new wp::shmMem::shmMem(MEMKEY, SERVERCREATE);
     ret = slab.Init();
     if(ret < 0){
@@ -248,9 +250,14 @@ int Pdcserver::register_vm(map<string,string > &client, Msginfo *msg)
         return -1;
     }
     if(clusters.empty()){
+        cerr<<" create new ceph backend "<<endl;
         cephcluster= new CephBackend(nm,"/etc/ceph/ceph.conf");
         clusters[nm] = cephcluster;
+    }else{
+        cerr<<" find exist ceph backend "<<endl;
+        cephcluster = cluster[nm];
     }
+    assert(cephcluster);
     cerr<<"register vm:"<<client<<endl;
     cephcluster->register_client(client,msg);
 

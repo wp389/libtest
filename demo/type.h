@@ -232,14 +232,15 @@ struct PdcClientInfo{
     
 };
 
+
 struct  Msginfo{
     bool sw;
     u64 opid;
     pid_t pid;
     pid_t remote_pid;
-    map<string , int >mqkeys;
-    map<string , string >pipekeys;
-    map<string ,int>semkeys;
+    
+    pipekey mqkeys;
+
     PdcIomachine opcode;  //opcode
     
     PdcClientInfo client;
@@ -274,9 +275,15 @@ struct  Msginfo{
         cerr<<" ,op = "<<opcode;
         cerr<<" ,client.pool ="<<client.pool;
         cerr<<" ,client.rbd ="<<client.volume;
-        cerr<<" ,client.pipekey ="<<client.pipekey;
+        //cerr<<" ,client.pipekey ="<<client.pipekey;
         cerr<<" ,offset ="<<client.offset;
-        cerr<<" ,len ="<<client.len<<endl;
+        cerr<<" ,len ="<<client.len;
+
+        if(1){
+            cerr<<" ,pipe recv keys:"<<mqkeys.key.;
+            cerr<<" ,sem recv keys:"<<mqkeys.semkey;
+        }
+        cerr<<endl;
     }
     void insert_op(void *p_op){
         op = p_op;

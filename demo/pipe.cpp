@@ -47,28 +47,32 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
 *   so we need to create reserved 
 *
 */
-int createserverqueues(map<string,string>&pipekeys, map<string,int>semkeys,map<string ,void *> &mqs)
+int createserverqueues(void * mqkeys,map<string ,void *> &mqs)
 {
 
     int r;
-    map<string ,string >::iterator pit = pipekeys.find("send");
-    map<string ,int >::iterator sit = semkeys.find("send");
-	
-    assert(pit != pipekeys.end() || sit!=semkeys.end());
+    pkey * pk = (pkey*)mqkeys;
+    string newkey(pk->key);
+    //map<string ,string >::iterator pit = pipekeys.find("recv");
+    //map<string ,int >::iterator sit = semkeys.find("recv");
 
-    cerr<<"create server queues: "<<pit->second <<" sem:"<<sit->second<<endl;
+    //assert(pit != pipekeys.end() || sit !=semkeys.end());
 
-    pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPECLIENT);
-    sendmq->ResetPipeKey(pit->second);
-    sendmq->ResetSemKey(sit->second);
-    r = sendmq->Init();
-    if(r < 0){
-        cerr<<"create recvmq failed:"<<r<<endl;
-        return -1;
+    cerr<<"create server queues: "<<newkey <<" sem:"<<pk->semkey<<endl;
+    if(1){
+        
+        pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPECLIENT);
+        sendmq->ResetPipeKey(newkey);
+        sendmq->ResetSemKey(pk->semkey);
+        r = sendmq->Init();
+        if(r < 0){
+            cerr<<"create recvmq failed:"<<r<<endl;
+            return -1;
+        }
+    
+        mqs.insert(pair<string,void *>(SENDMQ, (void*)sendmq));
     }
 	
-    mqs.insert(pair<string,void *>("send", (void*)sendmq));
-    
     return 0;
 }
 

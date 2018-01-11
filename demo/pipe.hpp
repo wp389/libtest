@@ -24,6 +24,11 @@
 using namespace std;
 //namespace wp {
 namespace pdcPipe {
+	struct pkey{
+		char key[NAMELENTH];
+		int semkey;
+		
+	};
 
 class SemLock {
 public:
@@ -186,7 +191,7 @@ public:
                          semkey = newkey; 
                          return 0;
                     }
-                    string Getkeys() {return m_key;}
+                    char * Getkeys() {return m_key.c_str();}
                     int GetSemKey() {return semkey;}
 			int GetFd() {return fd;}
 			bool isEmpty() {
@@ -265,7 +270,7 @@ public:
 	
 	extern int createclientqueues(map<string ,void *> &mqs,bool sw);
 	
-	extern int createserverqueues(map<string,string>&pipekeys, map<string,int>semkeys,map<string ,void *> &mqs);
+	extern int createserverqueues(void * mqkeys,map<string ,void *> &mqs);
 
 	}
 

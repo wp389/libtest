@@ -107,6 +107,7 @@ int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pd
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio write");
 
+    
     /*
     pthread_mutex_lock(&pdc->iomutex);
     pdc->msgop.push_back(msg);
@@ -126,7 +127,8 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
         assert(0);
         return -1;
     }
-
+    msg->dump("register_client");
+    cerr<<"vmclient:"<<vmclient<<" radoses:"<<radoses<<endl;
     map<string ,string>::iterator it = vmclient.begin();
     map<string, RadosClient*>::iterator itm = radoses.find(it->first);
     if(itm  != radoses.end()){
@@ -151,7 +153,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
         CephBackend::RbdVolume * rbd = new CephBackend::RbdVolume(it->second,rados);
         if(rbd->init() < 0) return -1;
         
-        r = pdcPipe::createserverqueues(msg->pipekeys,msg->semkeys,rbd->mq);
+        r = pdcPipe::createserverqueues((void *)&msg->mqkeys,rbd->mq);
         if(r < 0){
             cerr<<"create server queues failed"<<endl;
             return r;
