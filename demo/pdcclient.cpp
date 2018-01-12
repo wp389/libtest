@@ -72,7 +72,7 @@ void* PdcClient::Finisherthreads::_process()
     while(1){
         if(stop()) continue;
         if(!p_pipe) {
-            p_pipe = pdc->ackmq[RECVMQ];
+            p_pipe = pdc->ackmq;
             continue;
         }
 	
@@ -86,6 +86,12 @@ void* PdcClient::Finisherthreads::_process()
 
         if(msg){
             msg->dump("client finish tp op");
+            if(msg->opcode == ACK_MEMORY){
+                pthread_mutex_lock(&pdc->msgmutex);
+                pdc->msgop.push_back(msg);
+                pthread_mutex_unlock(&pdc->msgmutex);
+
+            }
             if(msg->opcode == RW_W_FINISH){
                 cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
                 PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);
@@ -192,20 +198,8 @@ void* PdcClient::Msgthreads::_process()
                     continue;
 
                 }
-                //send msg and wait for ack:
-                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[RECVMQ];
-                Msginfo* m = p_pipe->pop();
-                //msg = m; // need todo :
                 
-                msg->copy(m);
-                p_pipe->clear();
-                msg->opcode = PDC_AIO_WRITE;
-                msg->dump("get memory ack, todo RW");
-                //assert(msg->opcode == ACK_MEMORY);
-                 pthread_mutex_lock(&pdc->iomutex);
-                 pdc->ops.push_back(msg);
-                 pthread_mutex_unlock(&pdc->iomutex);
-                 cerr<<"op "<<msg->opid<<" to ops queue"<<endl;
+                delete msg;
                 //TODO:SET END TIME
             }else if(msg->opcode == PDC_AIO_READ){
                 /*
@@ -220,17 +214,20 @@ void* PdcClient::Msgthreads::_process()
                 pc->ops.push_back(msg);
                 pthread_mutex_unlock(&pdc->msgmutex);
 
-            }else if(msg->opcode == RW_W_FINISH || msg->opcode == RW_R_FINISH){
-                //PdcOp *op = reinterpret_cast<PdcOp *>(msg->pop_op());
-                //assert(op);
-                pdc->OpFindClient(msg);
-                pthread_mutex_lock(&pdc->finimutex);
-                pc->finishop.push_back(msg);
-                pthread_mutex_unlock(&pdc->finimutex);
-
+            }else if(msg->opcode == ACK_MEMORY){
+            //send msg and wait for ack:
+                Msginfo *op = new Msginfo();
+                op->copy(msg);
+                op->opcode = PDC_AIO_WRITE;
+                op->dump("get memory ack, todo RW");
+                //assert(msg->opcode == ACK_MEMORY);
+                pthread_mutex_lock(&pdc->iomutex);
+                pdc->ops.push_back(op);
+                pthread_mutex_unlock(&pdc->iomutex);
+                cerr<<"op "<<op->opid<<" to ops queue"<<endl;
             }
 
-
+        p_pipe->clear();
         }
         if(r < 0){
             cerr<<"msg do_op failed :"<<r <<endl;

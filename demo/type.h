@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
-//#include <malloc.h>
+#include <malloc.h>
 
 #define LOCALTEST 1
 //#include "pipe.hpp"
@@ -163,16 +163,16 @@ public:
 };
 
 typedef enum {
-    OPEN_RADOS = 0xa,
-    OPEN_RBD,
-    PDC_AIO_WRITE,
-    PDC_AIO_READ,
-    GET_MEMORY,
-    ACK_MEMORY,
+    OPEN_RADOS = 0xa,	//10
+    OPEN_RBD,			//11
+    PDC_AIO_WRITE,		//12
+    PDC_AIO_READ,		//13
+    GET_MEMORY,			//14
+    ACK_MEMORY,			//15
     RW_OP,
     MGR_OP,
     RW_FINISH,
-    RW_W_FINISH,
+    RW_W_FINISH,		//19
     RW_R_FINISH,
     
 
@@ -245,7 +245,7 @@ struct  Msginfo{
     pid_t remote_pid;
     
     pipekey mqkeys;
-
+    
     PdcIomachine opcode;  //opcode
     
     PdcClientInfo client;
@@ -303,10 +303,10 @@ struct  Msginfo{
             cerr<<" ,sem recv keys:"<<mqkeys.semkey;
         }
 
-        if(data.indexlist.size() > 0){
+        if(data.chunsize > 0){
             //vector<u64>::iterator it;
             cerr<<" ,indexlist.size:"<<data.chunksize<<" :";
-            for(int i = 0;i < op->data.chunksize;i++){
+            for(int i = 0;i < data.chunksize;i++){
                 cerr<<" "<<i;
             }
 

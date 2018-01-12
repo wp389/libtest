@@ -157,7 +157,7 @@ void* Pdcserver::Msgthreads::_process()
                 //pipe = server->ackmq[client];
                 r = pipe->push(msg);
                 if(r < 0){
-                    msg.dump("push failed");
+                    msg->dump("push failed");
                     cerr<<"pipe push msg:"<<msg->opid<<" failed"<<endl;
                     continue;
                 }
