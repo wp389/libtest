@@ -172,11 +172,12 @@ public:
 	                               }
 					}
 				}
-				if(s_type == PIPESERVER){
+				//if(s_type == PIPESERVER){
+                           if(1){
                                  fd = ::open(m_key.c_str(), m_model);
 					if(fd < 0 ){
 					    cerr<<"open :"<<m_key<<"failed "<<endl; 
-					    return -1; 
+					    return fd; 
 	                           }
 				}
                           t = new T();
@@ -191,7 +192,7 @@ public:
                          semkey = newkey; 
                          return 0;
                     }
-                    char * Getkeys() {return m_key.c_str();}
+                    const char * Getkeys() {return m_key.c_str();}
                     int GetSemKey() {return semkey;}
 			int GetFd() {return fd;}
 			bool isEmpty() {
@@ -211,14 +212,16 @@ public:
 
                     int openpipe(){
                         if(fd != -1) return 0;
-                        if((fd = ::open(m_key.c_str(), m_model)) < 0 ){
-                           cerr<<"open m_key:"<<m_key <<" failed"<<endl;
+                        fd = ::open(m_key.c_str(), m_model);
+                        if(fd < 0 ){
+                           cerr<<"open m_key:"<<m_key <<" fd:"<<fd<<" failed"<<endl;
 			       return -1;
                         }
                         return 0;
 			}
 			int  push(T *& a){
                         int r = 0;
+                        cerr<<"pipe to push:"<<m_key<<endl;
                         //semLockGuard oLock(m_Sem);
                         if(openpipe() < 0 ) return -1;
                         if (isFull()) {
@@ -234,13 +237,14 @@ public:
 
 			T* pop() {
                         int r = 0;
+                        cerr<<"pipe to pop:"<<m_key<<endl;
                         //semLockGuard oLock(m_Sem);
                         if(openpipe() < 0 ) return NULL;
                         if (isEmpty()) {
                             return NULL;//应该选择抛出异常等方式，待改进；
                         }
                         //T *t = new T();
-			    //while(r  <= 0)		
+			    while(r  <= 0)		
                         r = ::read(fd, t ,sizeof(T));  //block
 				
                         if(r == sizeof(T)){
@@ -267,7 +271,8 @@ public:
 			std::string m_sErrMsg;
 		};
 
-	
+	extern void copymqs(map<string ,void *> &mqs,PdcPipe<Msginfo>* send, 
+	                                   PdcPipe<Msginfo>*recv);
 	extern int createclientqueues(map<string ,void *> &mqs,bool sw);
 	
 	extern int createserverqueues(void * mqkeys,map<string ,void *> &mqs);

@@ -53,16 +53,19 @@ class CephBackend{
     string _confpath;
 public:
     void *sendmq;
+    list<Msginfo *> *_queue;
 public:
     class RadosClient{
         string radosname;
         string confpath;
     public:
+        CephBackend *ceph;
+    public:
         rados_t cluster;
         rados_ioctx_t ioctx;
         map<string , void *> volumes;
     public:
-        RadosClient(string nm, string _conf);
+        RadosClient(string nm, string _conf,CephBackend *_ceph);
         ~RadosClient() {}
         const char * GetName() {return radosname.c_str();}
         int init();
@@ -77,7 +80,7 @@ public:
     public:
             map<string ,void*>mq;
     public:
-        RbdVolume(string nm, RadosClient* &_rados): 
+        RbdVolume(string nm, RadosClient* _rados): 
             rbdname(nm),rados(_rados)
             //pipe(rbdname.c_str(), 12, PIPEWRITE, PIPECLIENT) 
             {}
@@ -92,7 +95,7 @@ public:
 
 
 public:
-    CephBackend(string nm, string confpath);
+    CephBackend(string nm, string confpath, list<Msginfo *>* msgop);
     ~CephBackend();
     int register_client(map<string,string > &vmclient, Msginfo *msg);
     void *findclient(map<string, string> *opclient);

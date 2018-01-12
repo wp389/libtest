@@ -1,27 +1,45 @@
 In file included from libpdc.cpp:3:
-./type.h:19:10: fatal error: 'malloc.h' file not found
-#include <malloc.h>
-         ^
-1 error generated.
+./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
+        if(data.indexlist.size() > 0){
+           ~~~~~~~~~~~~~~^~~~~
+./type.h:309:33: error: member reference base type 'void' is not a structure or union
+            for(int i = 0;i < op->data.chunksize;i++){
+                              ~~^ ~~~~
+2 errors generated.
 In file included from pdcclient.cpp:6:
 In file included from ./pdcclient.hpp:8:
 In file included from ./backend_ceph.hpp:5:
-./type.h:19:10: fatal error: 'malloc.h' file not found
-#include <malloc.h>
-         ^
-1 error generated.
+./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
+        if(data.indexlist.size() > 0){
+           ~~~~~~~~~~~~~~^~~~~
+./type.h:309:33: error: member reference base type 'void' is not a structure or union
+            for(int i = 0;i < op->data.chunksize;i++){
+                              ~~^ ~~~~
+pdcclient.cpp:75:32: error: array subscript is not an integer
+            p_pipe = pdc->ackmq[RECVMQ];
+                               ^~~~~~~
+3 errors generated.
 In file included from backend_ceph.cpp:4:
-./type.h:19:10: fatal error: 'malloc.h' file not found
-#include <malloc.h>
-         ^
-1 error generated.
+./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
+        if(data.indexlist.size() > 0){
+           ~~~~~~~~~~~~~~^~~~~
+./type.h:309:33: error: member reference base type 'void' is not a structure or union
+            for(int i = 0;i < op->data.chunksize;i++){
+                              ~~^ ~~~~
+2 errors generated.
 In file included from pipe.cpp:3:
-./type.h:19:10: fatal error: 'malloc.h' file not found
-#include <malloc.h>
-         ^
-1 error generated.
+./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
+        if(data.indexlist.size() > 0){
+           ~~~~~~~~~~~~~~^~~~~
+./type.h:309:33: error: member reference base type 'void' is not a structure or union
+            for(int i = 0;i < op->data.chunksize;i++){
+                              ~~^ ~~~~
+2 errors generated.
 In file included from type.cc:4:
-./type.h:19:10: fatal error: 'malloc.h' file not found
-#include <malloc.h>
-         ^
-1 error generated.
+./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
+        if(data.indexlist.size() > 0){
+           ~~~~~~~~~~~~~~^~~~~
+./type.h:309:33: error: member reference base type 'void' is not a structure or union
+            for(int i = 0;i < op->data.chunksize;i++){
+                              ~~^ ~~~~
+2 errors generated.

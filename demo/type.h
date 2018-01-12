@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
-#include <malloc.h>
+//#include <malloc.h>
 
 #define LOCALTEST 1
 //#include "pipe.hpp"
@@ -64,7 +64,8 @@ struct pdcdata{
     void * c;
     u64 offset;
     int len;
-    list<u64> indexlist;
+    int chunksize;
+    u64 indexlist[4];
 
 };
 
@@ -232,7 +233,11 @@ struct PdcClientInfo{
     
 };
 
-
+struct pipekey{
+    char key[NAMELENTH];
+    int semkey;
+    pipekey() {};
+};
 struct  Msginfo{
     bool sw;
     u64 opid;
@@ -246,13 +251,27 @@ struct  Msginfo{
     PdcClientInfo client;
     pdcdata data;
     const void * originbuf;
-    void * op;
-    void * volume;
+    void * op;			//
+    void * volume;		//rbd volume info in client or server
     int return_code;
 	
     Msginfo():sw(true),remote_pid(0),return_code(-1) {pid = getpid(); opid = ++msgid;};
+    int copy(Msginfo *m){
+        if(m){
+            this->opcode = m->opcode;
+            this->client = m->client;
+            this->remote_pid = m->pid;
+            this->data = m->data;
+            this->originbuf = m->originbuf;
+            this->op = m->op;
+            //this->volume = m->volume;   
+            this->return_code = m->return_code;
+        }
+        return 0;
+    }
     Msginfo & operator =(const Msginfo*&m){
         if(this != m){
+            
             //this->mqkeys.swap(m->mqkeys);
             this->opcode = m->opcode;
             this->client = m->client;
@@ -276,12 +295,21 @@ struct  Msginfo{
         cerr<<" ,client.pool ="<<client.pool;
         cerr<<" ,client.rbd ="<<client.volume;
         //cerr<<" ,client.pipekey ="<<client.pipekey;
-        cerr<<" ,offset ="<<client.offset;
-        cerr<<" ,len ="<<client.len;
+        cerr<<" ,offset ="<<data.offset;
+        cerr<<" ,len ="<<data.len;
 
         if(1){
-            cerr<<" ,pipe recv keys:"<<mqkeys.key.;
+            cerr<<" ,pipe recv keys:"<<mqkeys.key;
             cerr<<" ,sem recv keys:"<<mqkeys.semkey;
+        }
+
+        if(data.indexlist.size() > 0){
+            //vector<u64>::iterator it;
+            cerr<<" ,indexlist.size:"<<data.chunksize<<" :";
+            for(int i = 0;i < op->data.chunksize;i++){
+                cerr<<" "<<i;
+            }
+
         }
         cerr<<endl;
     }

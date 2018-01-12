@@ -11,17 +11,28 @@ using namespace pdcPipe;
 int atokey = 251;
 int GetMqKey() { cerr<<"Getkey:"<<atokey<<endl;return atokey++; }
 namespace pdcPipe{
+
+
+void copymqs(map<string ,void *> &mqs,PdcPipe<Msginfo>* send, PdcPipe<Msginfo>*recv)
+{
+    cerr<<"RBD USE RADOS'S pipes mq"<<endl;
+    mqs.insert(pair<string,void *>("recv", (void*)recv));
+    mqs.insert(pair<string,void *>("recv", (void*)send));
+
+
+}
 int createclientqueues(map<string ,void *> &mqs,bool sw)
 {
     stringstream newkey;
     string pkey;
     int skey;
     int r;
-    
+
     newkey<<GetMqKey();
     newkey >>pkey;
     skey = GetMqKey();
 
+    cerr<<"create client queue:"<<pkey<<" sw is:"<<sw<<endl;
     pdcPipe::PdcPipe<Msginfo>::ptr recvmq = new pdcPipe::PdcPipe<Msginfo>(PIPESERVER);
     recvmq->ResetPipeKey(pkey);
     recvmq->ResetSemKey(skey);
@@ -29,7 +40,8 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
     if(r < 0){
         cerr<<"create recvmq failed:"<<r<<endl;
     }
-    if(!sw){
+    //if(!sw)
+    if(1){
         pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPEKEY,PIPESEMKEY,PIPEWRITE ,PIPECLIENT);
         r = sendmq->Init();
         if(r < 0){
@@ -39,6 +51,8 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
     }
 
     mqs.insert(pair<string,void *>("recv", (void*)recvmq));
+
+
     return 0;
 }
 
@@ -53,10 +67,6 @@ int createserverqueues(void * mqkeys,map<string ,void *> &mqs)
     int r;
     pkey * pk = (pkey*)mqkeys;
     string newkey(pk->key);
-    //map<string ,string >::iterator pit = pipekeys.find("recv");
-    //map<string ,int >::iterator sit = semkeys.find("recv");
-
-    //assert(pit != pipekeys.end() || sit !=semkeys.end());
 
     cerr<<"create server queues: "<<newkey <<" sem:"<<pk->semkey<<endl;
     if(1){

@@ -180,6 +180,8 @@ public:
                 sb->DataCount = 0;
                 sb->Front = 0;
                 sb->Rear = 0;
+                sb->Avalid = sb->AllCount;
+                sb->Inuse = 0;
                 //::memcpy(m_pShm,&Head,sizeof(QueueHead));
             }else if(usetype ==1){
             
@@ -224,14 +226,15 @@ public:
     /* if in one simple thread ,do not use lock
     *   but ,when use in multithreads ,a lock is needed.
     */
-    int  get(u32 size, list<u64> & sum){  //Get memory block, 
+    int  get(u32 size, u64* sum){  //Get memory block, 
         //list<u64> sum;
+        int n =0;
         if (isFull() ) {
             cerr<<"shm had no memory, can not get one"<<endl;
             assert(0);
             return  -1;
         }
-        if((getAvalid() *sb->ItemSize) < size ){
+        if((getAvalid() *(sb->ItemSize)) < size ){
             cerr<<"shm had no memory, can not get one"<<endl;
             assert(0);
             return -1;
@@ -241,9 +244,10 @@ public:
         count = ((count * sb->ItemSize ) >=  size)? count :count +1;
         while(count > 0){
             if(sb->Front < sb->AllCount){
-                for(u64 i = sb->Front; i< sb->AllCount;i++){
+                for(u64 i = sb->Front; i< sb->AllCount && count > 0;i++){
                     count--;
-                    sum.push_back(i);
+                    sum[n++] = i;
+                    //sum.push_back(i);
                     sb->Front = sb->Front+1;
                     sb->Inuse++;
                     sb->Avalid--;
@@ -253,15 +257,17 @@ public:
                 
                 assert(freelist.size() >= count);
                 count--;
-                sum.push_back(freelist.front());
-                freelist.pop_front();
+                sum[n++] = freelist.front();
+                //sum.push_back(freelist.front());
+                //freelist.pop_front();   //for list
+                freelist.erase(freelist.begin());  //for vetor
                 sb->Inuse++;
                 sb->Avalid--;
 
             }
             
     	}
-        return 0;
+        return n;
         
     }
 
@@ -272,12 +278,12 @@ public:
 
         return (T *)(m_pShm + sizeof(SuperBlock) + index * sizeof(T));
     }
-    int put(list<u64> &used){
+    int put(vector<u64> &used){
+        freelist.assign(used.begin(), used.end());
+        //freelist.splice(freelist.end(), used, used.begin(), used.end()); //for list
         sb->Avalid  += used.size();
         sb->Inuse -= used.size();
-        freelist.splice(freelist.end(), used, used.begin(), used.end());
-        //sb->Inuse--;
-        //sb->Avalid++;
+
     }
 
 
@@ -292,8 +298,8 @@ public:
     int m_iStatus;
     int m_iCreate;
     int m_key;
-    list<u64> freelist;
-    list<u64> usedlist;
+    vector<u64> freelist;
+    vector<u64> usedlist;
     char *pdata;
     T *pmem;
     SemLock m_Sem;

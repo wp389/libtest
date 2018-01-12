@@ -31,8 +31,8 @@ int PdcCompletion::complate()
     return 0;
 }
 
-CephBackend::RadosClient::RadosClient(string nm, string _conf):
-    radosname(nm),confpath(_conf),cluster(NULL)
+CephBackend::RadosClient::RadosClient(string nm, string _conf, CephBackend *_ceph):
+    radosname(nm),confpath(_conf),ceph(_ceph),cluster(NULL)
 {
     
 }
@@ -107,7 +107,8 @@ int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pd
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio write");
 
-    
+
+    prbd->rados->ceph->_queue->push_back(msg);
     /*
     pthread_mutex_lock(&pdc->iomutex);
     pdc->msgop.push_back(msg);
@@ -128,7 +129,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
         return -1;
     }
     msg->dump("register_client");
-    cerr<<"vmclient:"<<vmclient<<" radoses:"<<radoses<<endl;
+    cerr<<"vmclient:"<<vmclient.size()<<" radoses:"<<radoses.size()<<endl;
     map<string ,string>::iterator it = vmclient.begin();
     map<string, RadosClient*>::iterator itm = radoses.find(it->first);
     if(itm  != radoses.end()){
@@ -143,9 +144,10 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
             if(rbd->init() < 0) return -1;
             //vols[it->second] = rbd;
             vols.insert(pair<string ,RbdVolume*>(it->second ,rbd));
+            
         }
     }else{
-        CephBackend::RadosClient *rados = new CephBackend::RadosClient(it->first, "/etc/ceph/ceph.conf");
+        CephBackend::RadosClient *rados = new CephBackend::RadosClient(it->first, "/etc/ceph/ceph.conf",this);
         if(rados->init() < 0){
             return -1;
         }
@@ -159,6 +161,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
             return r;
         }
         vols[it->second] = rbd;
+        
     }
 
 	
@@ -179,8 +182,8 @@ void* CephBackend::findclient(map<string, string> *opclient)
     }
     return NULL;
 }
-CephBackend::CephBackend(string nm,string _conf):
-    name(nm),_confpath(_conf)
+CephBackend::CephBackend(string nm,string _conf, list<Msginfo *>*msgop):
+    name(nm),_confpath(_conf),_queue(msgop)
 {
 
 }

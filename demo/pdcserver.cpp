@@ -30,17 +30,18 @@ void* Pdcserver::Iothreads::_process()
         }
         Msginfo *op = pdc->ops.front();
         vol = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
-        if(vol){
+        if(!vol){
+            op->dump("get NULL volume");
             cerr<<"get NULL volume"<<endl; 
             continue;
         }
         pdc->ops.pop_front();
         pthread_mutex_unlock(&pdc->iomutex);
         op->dump("server io tp op");
-        list<u64>::iterator itm = op->data.indexlist.begin();
-        for(;itm != op->data.indexlist.end();itm++){
+
+        for(int i = 0;i < op->data.chunksize;i++){
             //memset(op->data.pdata, 6, op->data.len);
-            simpledata * pdata = pdc->slab.getaddbyindex(*itm);
+            simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
             //TODO: WRITE
             r = do_op(pdata);
         }
@@ -75,7 +76,7 @@ void* Pdcserver::Finisherthreads::_process()
             pthread_mutex_unlock(&pdc->finimutex);
             continue;
         }
-        Msginfo *op = pdc->ops.front();
+        Msginfo *op = pdc->finishop.front();
         pdc->finishop.pop_front();
         pthread_mutex_unlock(&pdc->finimutex);
         op->dump("server finish tp op");
@@ -85,8 +86,10 @@ void* Pdcserver::Finisherthreads::_process()
         prbd = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
         //TODO: here ,we connect rados  and write rbd
         op->return_code = 0;
-
-        p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >(prbd->mq[SENDMQ]);
+        if(prbd)
+            p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >(prbd->mq[SENDMQ]);
+        else
+            assert(0);
         r = p_pipe->push(op);
         sum++;
         if(r < 0){
@@ -135,23 +138,27 @@ void* Pdcserver::Msgthreads::_process()
                     cerr<<"register vm failed ret = "<<r <<endl;
                     continue;
                 }
-            }else if(msg->opcode == GET_MEMORY){
-                list<u64> listadd ;
                 
-                r = pdc->slab.get(msg->client.len, listadd);
+            }else if(msg->opcode == GET_MEMORY){
+                //vector<u64> listadd ;
+                pdc->OpFindClient(msg);
+                r = pdc->slab.get(msg->data.len, msg->data.indexlist);
                 if(r < 0){
                     cerr<<"get memory failed"<<endl;
                     continue;
                 }
+                msg->data.chunksize = r;
                 msg->opcode = ACK_MEMORY;
-                msg->data.indexlist.swap(listadd);
+                //msg->data.indexlist.swap(listadd);
                 pdcPipe::PdcPipe<Msginfo>::ptr pipe;
 
-                //CephBackend::RbdVolume *vol = server;
-                pipe = server->ackmq[client];
+                CephBackend::RbdVolume *vol = reinterpret_cast<CephBackend::RbdVolume *>(msg->volume);
+                pipe =reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(vol->mq[SENDMQ]);
+                //pipe = server->ackmq[client];
                 r = pipe->push(msg);
                 if(r < 0){
-                    cerr<<"pipe push msg:"<<msg<<" failed"<<endl;
+                    msg.dump("push failed");
+                    cerr<<"pipe push msg:"<<msg->opid<<" failed"<<endl;
                     continue;
                 }
             }else if(msg->opcode == PDC_AIO_WRITE){
@@ -191,7 +198,7 @@ int Pdcserver::init()
     string state("init: ");
     cerr<<state<<"start thread:"<<endl;
     
-    CephBackend* pceph = new CephBackend("ceph","/etc/ceph/ceph.conf");
+    CephBackend* pceph = new CephBackend("ceph","/etc/ceph/ceph.conf", &msgop);
     clusters["ceph"] = pceph;
     pceph->radoses.clear();
     pceph->vols.clear();
@@ -251,16 +258,29 @@ int Pdcserver::register_vm(map<string,string > &client, Msginfo *msg)
     }
     if(clusters.empty()){
         cerr<<" create new ceph backend "<<endl;
-        cephcluster= new CephBackend(nm,"/etc/ceph/ceph.conf");
+        cephcluster= new CephBackend(nm,"/etc/ceph/ceph.conf", &msgop);
         clusters[nm] = cephcluster;
     }else{
         cerr<<" find exist ceph backend "<<endl;
-        cephcluster = cluster[nm];
+        cephcluster = clusters[nm];
     }
     assert(cephcluster);
-    cerr<<"register vm:"<<client<<endl;
+    cerr<<"register vm:"<<client.size()<<endl;
     cephcluster->register_client(client,msg);
 
+    /*
+    map<string,string>::iterator it = client.begin();
+    if(it != client.end()){
+        cerr<<"register pipe:"<<it->first<<" "<<it->second<<endl;
+        CephBackend::RadosClient *rados = clusters[nm]->radoses[it->first];
+        CephBackend::RbdVolume *prbd = reinterpret_cast<CephBackend::RbdVolume *>(rados->volumes[it->second]);
+        pdcPipe::PdcPipe<Msginfo>::ptr mq =  reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);  
+        //ackmq.insert(map<map<string,string>, pdcPipe::PdcPipe<Msginfo>*  >(pair(client,mq)));
+        assert(mq);
+        ackmq[client] = mq;
+
+    }
+    */
 return 0;
 }
 

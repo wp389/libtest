@@ -70,7 +70,7 @@ int pdc_rados_ioctx_create(pdc_rados_t vmclient, const char *pool_name,
     }
     map<string ,CephBackend::RadosClient *>::iterator it = pceph->radoses.find(radosname);
     if(it == pceph->radoses.end()){  // not exist ,create a new one
-        prados = new CephBackend::RadosClient(radosname, "/etc/ceph/ceph.conf");
+        prados = new CephBackend::RadosClient(radosname, "/etc/ceph/ceph.conf",pceph);
         pceph->radoses[radosname] = prados;
     }else{
     prados = pceph->radoses[radosname];
@@ -106,11 +106,7 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
     }else {    //NOT EXIST
         prbd = new CephBackend::RbdVolume(rbdname, prados);
         
-        r = pdcPipe::createclientqueues(prbd->mq, pdcclient->has_ackmq());
-        if(r< 0){
-            cerr<<"createclientqueues:"<<rbdname<<" failed :"<<r<<endl;
-            return -1;
-        }        
+        pdcPipe::copymqs(prbd->mq, & pdcclient->msgmq,pdcclient->ackmq);     
         
         r = prbd->init();
         if(r< 0){
@@ -121,7 +117,7 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
         prados->volumes[rbdname] = (void *)prbd;
     }
 
-    pdcPipe::PdcPipe<Msginfo>::ptr recvmq = prbd->mq[RECVMQ];
+    pdcPipe::PdcPipe<Msginfo>::ptr recvmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[RECVMQ]);
     //msginfo will change to msgpool list  next step
     Msginfo *msg = new Msginfo();
     msg->opcode = OPEN_RBD;
