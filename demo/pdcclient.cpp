@@ -87,9 +87,14 @@ void* PdcClient::Finisherthreads::_process()
         if(msg){
             msg->dump("client finish tp op");
             if(msg->opcode == ACK_MEMORY){
-                pthread_mutex_lock(&pdc->msgmutex);
-                pdc->msgop.push_back(msg);
-                pthread_mutex_unlock(&pdc->msgmutex);
+                msg->opcode = PDC_AIO_WRITE;
+                p_pipe->clear();
+                
+                msg->dump("get memory ack, todo RW");
+                pdc->OpFindClient(msg);
+                pthread_mutex_lock(&pdc->iomutex);
+                pdc->ops.push_back(msg);
+                pthread_mutex_unlock(&pdc->iomutex);
 
             }
             if(msg->opcode == RW_W_FINISH){
@@ -178,7 +183,7 @@ void* PdcClient::Msgthreads::_process()
             }
             if(msg->opcode == OPEN_RADOS){
                 cerr<<"do not come here "<<msg->opid<<endl;
-		   continue;
+                continue;
             }else if(msg->opcode == OPEN_RBD){
                  cerr<<"do not come here "<<msg->opid<<endl;
                  continue;
@@ -189,12 +194,13 @@ void* PdcClient::Msgthreads::_process()
                 list<u64> listadd ;
                 //TODO:SET START TIME
                 cerr<<"start to get memory"<<endl;
-                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ];
+                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
+                assert(p_pipe);
                 r = p_pipe->push(msg);
                 if(r< 0){
                     cerr<<"=============get memory failed"<<endl;
                     msg->dump(" msg push failed" );
-			delete msg;
+                    delete msg;
                     continue;
 
                 }
@@ -216,6 +222,8 @@ void* PdcClient::Msgthreads::_process()
 
             }else if(msg->opcode == ACK_MEMORY){
             //send msg and wait for ack:
+                assert(0);
+                /*
                 Msginfo *op = new Msginfo();
                 op->copy(msg);
                 op->opcode = PDC_AIO_WRITE;
@@ -225,6 +233,7 @@ void* PdcClient::Msgthreads::_process()
                 pdc->ops.push_back(op);
                 pthread_mutex_unlock(&pdc->iomutex);
                 cerr<<"op "<<op->opid<<" to ops queue"<<endl;
+                */
             }
 
         p_pipe->clear();

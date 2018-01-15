@@ -106,7 +106,7 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
     }else {    //NOT EXIST
         prbd = new CephBackend::RbdVolume(rbdname, prados);
         
-        pdcPipe::copymqs(prbd->mq, & pdcclient->msgmq,pdcclient->ackmq);     
+        pdcPipe::copymqs(prbd->mq, &pdcclient->msgmq,pdcclient->ackmq);     
         
         r = prbd->init();
         if(r< 0){
@@ -164,10 +164,11 @@ int pdc_rbd_aio_write(pdc_rbd_image_t image, u64 off, size_t len,
 
 void demo_completion(pdc_rbd_completion_t c,void *arg)
 {
+    struct timeval endtime;
     cerr<<" IO finished:"<<*(int*)arg<<endl;
  
-
-   
+    ::gettimeofday(&endtime, NULL);
+    cerr<<"end time is:"<<endtime.tv_sec<<"s + "<<endtime.tv_usec<<" us";
 }
 
 int main()
@@ -177,7 +178,7 @@ int main()
     pdc_rados_t prados;
     pdc_rados_ioctx_t ioctx;
     pdc_rbd_image_t img;
-	
+    struct timeval starttime;
     string vol("qemu-1");
 
 
@@ -204,6 +205,8 @@ int main()
         return -1;
     }	   
     pdc_rbd_completion_t c;
+    ::gettimeofday(&starttime, NULL);
+    cerr<<"start time is:"<<starttime.tv_sec<<"s + "<<starttime.tv_usec<<" us";
     r = pdc_create_aio_complation((void *)&id,demo_completion, & c);
     char *buf = (char *)malloc(1024);
     r = pdc_rbd_aio_write(img, 0, 1024, buf,c);

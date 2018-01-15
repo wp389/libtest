@@ -122,7 +122,9 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
     int r;
     CephBackend *cephcluster ;
     string nm("ceph");
-	
+    RadosClient *p_rados;
+        
+
     if(vmclient.empty()) {
         cerr<<"register NULL client"<<endl;
         assert(0);
@@ -133,6 +135,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
     map<string ,string>::iterator it = vmclient.begin();
     map<string, RadosClient*>::iterator itm = radoses.find(it->first);
     if(itm  != radoses.end()){
+        p_rados = itm->second;
         cerr<<"rados pool:"<<it->first<<" had existed"<<endl;
         if(vols.find(it->second)  != vols.end()){
             cerr<<"rbd "<< it->second<<" had existed"<<endl;
@@ -144,7 +147,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
             if(rbd->init() < 0) return -1;
             //vols[it->second] = rbd;
             vols.insert(pair<string ,RbdVolume*>(it->second ,rbd));
-            
+            p_rados->volumes[it->second] = (void *)rbd;
         }
     }else{
         CephBackend::RadosClient *rados = new CephBackend::RadosClient(it->first, "/etc/ceph/ceph.conf",this);
@@ -161,7 +164,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
             return r;
         }
         vols[it->second] = rbd;
-        
+        rados->volumes[it->second] = (void*) rbd;
     }
 
 	
@@ -170,13 +173,14 @@ return 0;
 
 void* CephBackend::findclient(map<string, string> *opclient)
 {
-    RbdVolume * vol;
+    void * vol;
     map<string ,string>::iterator it = opclient->begin();
     map<string, RadosClient*>::iterator itm = radoses.find(it->first);
 
     if(itm  != radoses.end()){
-        if(vols.find(it->second)  != vols.end()){
-            vol = vols[it->second];
+        RadosClient *r_volumes = itm->second;
+        if(r_volumes->volumes.find(it->second)  != r_volumes->volumes.end()){
+            vol = r_volumes->volumes[it->second];
             return (void*)vol;
         }
     }

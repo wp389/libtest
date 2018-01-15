@@ -303,7 +303,7 @@ struct  Msginfo{
             cerr<<" ,sem recv keys:"<<mqkeys.semkey;
         }
 
-        if(data.chunsize > 0){
+        if(data.chunksize > 0){
             //vector<u64>::iterator it;
             cerr<<" ,indexlist.size:"<<data.chunksize<<" :";
             for(int i = 0;i < data.chunksize;i++){

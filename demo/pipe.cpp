@@ -16,8 +16,10 @@ namespace pdcPipe{
 void copymqs(map<string ,void *> &mqs,PdcPipe<Msginfo>* send, PdcPipe<Msginfo>*recv)
 {
     cerr<<"RBD USE RADOS'S pipes mq"<<endl;
+    assert(send);
+    assert(recv);
     mqs.insert(pair<string,void *>("recv", (void*)recv));
-    mqs.insert(pair<string,void *>("recv", (void*)send));
+    mqs.insert(pair<string,void *>("send", (void*)send));
 
 
 }
