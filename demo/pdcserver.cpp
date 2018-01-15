@@ -52,7 +52,7 @@ void* Pdcserver::Iothreads::_process()
             vol->do_aio_write(op, off+ i*sizeof(simpledata), lengh, (char *)pdata, comp);   
         }
         
-        //vol->
+        if(0){
         //TODO: here ,we connect rados  and write rbd
         op->return_code = 0;
         if(op->opcode == PDC_AIO_WRITE) op->opcode =  RW_W_FINISH;
@@ -60,7 +60,7 @@ void* Pdcserver::Iothreads::_process()
         pthread_mutex_lock(&pdc->finimutex);
         pdc->finishop.push_back(op);
         pthread_mutex_unlock(&pdc->finimutex);
-       
+       }
     }
 
     return 0;
