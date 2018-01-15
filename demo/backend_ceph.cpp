@@ -128,6 +128,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
     if(op->isdone()){
         CephBackend::RbdVolume *prbd = (CephBackend::RbdVolume *)op->volume;
         if(! prbd) assert(0);
+        if(op->opcode == PDC_AIO_WRITE) op->opcode =  RW_W_FINISH;
         pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
         r = p_pipe->push(op);
     }
