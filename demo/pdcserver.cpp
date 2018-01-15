@@ -39,12 +39,20 @@ void* Pdcserver::Iothreads::_process()
         pthread_mutex_unlock(&pdc->iomutex);
         op->dump("server io tp op");
 
+        rbd_completion_t comp;
+        u64 off = op->data.offset;
+        u32 bufsize = op->data.len;
+        u32 lengh;
+        vol->do_create_rbd_completion(op, &comp);
         for(int i = 0;i < op->data.chunksize;i++){
             //memset(op->data.pdata, 6, op->data.len);
             simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
             //TODO: WRITE
-            r = do_op(pdata);
+            lengh = bufsize > sizeof(simpledata) ? sizeof(simpledata):bufsize;
+            vol->do_aio_write(op, off+ i*sizeof(simpledata), lengh, (char *)pdata, comp);   
         }
+        
+        //vol->
         //TODO: here ,we connect rados  and write rbd
         op->return_code = 0;
         if(op->opcode == PDC_AIO_WRITE) op->opcode =  RW_W_FINISH;
@@ -130,7 +138,6 @@ void* Pdcserver::Msgthreads::_process()
             //perf.inc();
             if(msg->opcode == OPEN_RADOS){
                 pdc->register_connection(msg);
-
 
             }else if(msg->opcode == OPEN_RBD){
                 r = pdc->register_vm(client, msg);

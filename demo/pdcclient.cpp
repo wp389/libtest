@@ -8,8 +8,9 @@
 
 int PdcClient::Iothreads::do_op(void * data)
 {
-    if( data)
-        memset(data , 3, 4096);
+
+    
+
     return 0;
 }
 
@@ -44,6 +45,18 @@ void* PdcClient::Iothreads::_process()
         msg->dump("iothread: client io tp op");
         if(msg->opcode == PDC_AIO_WRITE){
             cerr<<"push op aio write:"<<msg->opid<<endl;
+            u64 bufsize = msg->data.len;
+            char * buf = (char *)msg->originbuf;
+            for(int i = 0;i < msg->data.chunksize;i++){
+                //memset(op->data.pdata, 6, op->data.len);
+                u64 size = bufsize > sizeof(simpledata) ? sizeof(simpledata):bufsize;
+                
+                simpledata * pdata = pdc->slab.getaddbyindex(msg->data.indexlist[i]);
+                //TODO: WRITE
+                ::memcpy(pdata, &(buf[i*sizeof(simpledata)]), size);
+                //r = do_op(,pdata);
+                bufsize -= sizeof(simpledata);
+            }
             p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
             r = p_pipe->push(msg);
             if(r< 0){
@@ -101,7 +114,8 @@ void* PdcClient::Finisherthreads::_process()
                 cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
                 PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);
                 if(c && c->callback){
-                    c->callback(c->comp, c->callback_arg);
+                    ///c->callback(c->comp, c->callback_arg);
+                    c->complate(0);
                 
                 }
                 delete msg;
@@ -193,6 +207,7 @@ void* PdcClient::Msgthreads::_process()
                 msg->opcode =GET_MEMORY;
                 list<u64> listadd ;
                 //TODO:SET START TIME
+                
                 cerr<<"start to get memory"<<endl;
                 p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
                 assert(p_pipe);
@@ -216,9 +231,9 @@ void* PdcClient::Msgthreads::_process()
                 op->pid = msg->pid; // client pid;
                 */
                 pdc->OpFindClient(msg);
-                pthread_mutex_lock(&pdc->msgmutex);
+                pthread_mutex_lock(&pdc->iomutex);
                 pc->ops.push_back(msg);
-                pthread_mutex_unlock(&pdc->msgmutex);
+                pthread_mutex_unlock(&pdc->iomutex);
 
             }else if(msg->opcode == ACK_MEMORY){
             //send msg and wait for ack:

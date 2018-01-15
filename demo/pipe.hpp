@@ -221,14 +221,14 @@ public:
 			}
 			int  push(T *& a){
                         int r = 0;
-                        cerr<<"pipe to push:"<<m_key<<endl;
+                        //cerr<<"pipe to push:"<<m_key<<endl;
                         //semLockGuard oLock(m_Sem);
                         if(openpipe() < 0 ) return -1;
                         if (isFull()) {
                           return -1;
                         }
                         r = ::write(fd, a, sizeof(T));
-                        cerr<<" pipe push size:"<<r<<endl;
+                        //cerr<<" pipe push size:"<<r<<endl;
                         if(r != sizeof(T))
                             return -1;
 						
@@ -237,7 +237,7 @@ public:
 
 			T* pop() {
                         int r = 0;
-                        cerr<<"pipe to pop:"<<m_key<<endl;
+                        //cerr<<"pipe to pop:"<<m_key<<endl;
                         //semLockGuard oLock(m_Sem);
                         if(openpipe() < 0 ) return NULL;
                         if (isEmpty()) {

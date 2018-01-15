@@ -45,6 +45,7 @@ extern u64 opid;
 
 #define NAMELENTH 64
 #define SERVERCREATE 1
+#define CLIENTNOCREATE 0
 using namespace std;
 //using namespace wp::Pipe;
 //using namespace pdcPipe::PdcPipe;
@@ -243,7 +244,7 @@ struct  Msginfo{
     u64 opid;
     pid_t pid;
     pid_t remote_pid;
-    
+    int ref;
     pipekey mqkeys;
     
     PdcIomachine opcode;  //opcode
@@ -255,7 +256,10 @@ struct  Msginfo{
     void * volume;		//rbd volume info in client or server
     int return_code;
 	
-    Msginfo():sw(true),remote_pid(0),return_code(-1) {pid = getpid(); opid = ++msgid;};
+    Msginfo():sw(true),remote_pid(0),return_code(-1),ref(0) {pid = getpid(); opid = ++msgid;};
+    void ref_inc() {ref++;}
+    void ref_dec() {ref--;}
+    bool isdone() {return ref == 0;}
     int copy(Msginfo *m){
         if(m){
             this->opcode = m->opcode;
@@ -283,13 +287,16 @@ struct  Msginfo{
         return *this;
     }
     void dump(const char *f =NULL){
+        struct timeval time;
         if(!sw) return;
-		
-        cerr<<"msginfo: ";
+        ::gettimeofday(&time ,NULL);
+       
+        cerr<<"msginfo: at:"<<time.tv_sec<<" s + "<<time.tv_usec<<" us ";
         if(f)
         cerr<<f;
         cerr<<endl;
-        cerr<<" opid = "<<opid;
+        cerr<<" ,opref ="<<ref;
+        cerr<<" ,opid = "<<opid;
         cerr<<" ,pid ="<<pid;
         cerr<<" ,op = "<<opcode;
         cerr<<" ,client.pool ="<<client.pool;

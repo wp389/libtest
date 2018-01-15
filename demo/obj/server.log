@@ -1,38 +1,13 @@
-In file included from pdcserver.cpp:6:
-In file included from ./pdcserver.hpp:8:
-In file included from ./backend_ceph.hpp:5:
-./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
-        if(data.indexlist.size() > 0){
-           ~~~~~~~~~~~~~~^~~~~
-./type.h:309:33: error: member reference base type 'void' is not a structure or union
-            for(int i = 0;i < op->data.chunksize;i++){
-                              ~~^ ~~~~
-pdcserver.cpp:160:24: error: member reference type 'Msginfo *' is a pointer; maybe you meant to use '->'?
-                    msg.dump("push failed");
-                    ~~~^
-                       ->
-3 errors generated.
-In file included from backend_ceph.cpp:4:
-./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
-        if(data.indexlist.size() > 0){
-           ~~~~~~~~~~~~~~^~~~~
-./type.h:309:33: error: member reference base type 'void' is not a structure or union
-            for(int i = 0;i < op->data.chunksize;i++){
-                              ~~^ ~~~~
-2 errors generated.
-In file included from pipe.cpp:3:
-./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
-        if(data.indexlist.size() > 0){
-           ~~~~~~~~~~~~~~^~~~~
-./type.h:309:33: error: member reference base type 'void' is not a structure or union
-            for(int i = 0;i < op->data.chunksize;i++){
-                              ~~^ ~~~~
-2 errors generated.
-In file included from type.cc:4:
-./type.h:306:26: error: member reference base type 'u64 [4]' is not a structure or union
-        if(data.indexlist.size() > 0){
-           ~~~~~~~~~~~~~~^~~~~
-./type.h:309:33: error: member reference base type 'void' is not a structure or union
-            for(int i = 0;i < op->data.chunksize;i++){
-                              ~~^ ~~~~
-2 errors generated.
+Undefined symbols for architecture x86_64:
+  "_rados_conf_read_file", referenced from:
+      CephBackend::RadosClient::init(int) in backend_ceph-00842d.o
+  "_rados_connect", referenced from:
+      CephBackend::RadosClient::init(int) in backend_ceph-00842d.o
+  "_rados_create", referenced from:
+      CephBackend::RadosClient::init(int) in backend_ceph-00842d.o
+  "_rados_ioctx_create", referenced from:
+      CephBackend::RadosClient::init(int) in backend_ceph-00842d.o
+  "_rbd_open", referenced from:
+      CephBackend::RbdVolume::init(int) in backend_ceph-00842d.o
+ld: symbol(s) not found for architecture x86_64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)

@@ -98,7 +98,7 @@ public:
         ackmq(NULL),
         performace(NULL),
         iothread(NULL), msgthread(NULL), finisher(NULL),
-        slab(MEMKEY, SERVERCREATE),
+        slab(MEMKEY, CLIENTNOCREATE),
         ref(0)
         {
             pid = getpid();

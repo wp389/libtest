@@ -94,7 +94,7 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
     string rbdname(rbd_name);
     string poolname;
     PdcClient *pdcclient = pdc_client_mgr;
-	
+
     CephBackend::RbdVolume*prbd;
     //PdcClient * pclient = pdc_client_mgr;
     CephBackend::RadosClient *prados = reinterpret_cast<CephBackend::RadosClient *>(ioctx);
@@ -108,7 +108,7 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
         
         pdcPipe::copymqs(prbd->mq, &pdcclient->msgmq,pdcclient->ackmq);     
         
-        r = prbd->init();
+        r = prbd->init(0);
         if(r< 0){
             cerr<<"client create new rbd:"<<rbdname<<" failed :"<<r<<endl;
             return -1;

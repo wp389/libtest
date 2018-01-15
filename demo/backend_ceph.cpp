@@ -20,7 +20,7 @@ PdcCompletion::PdcCompletion(void *c):
     
 }
 
-int PdcCompletion::complate()
+int PdcCompletion::complate(int r)
 {
 
     cerr<<"pdc complate op:"<<opidx<<endl;
@@ -37,11 +37,11 @@ CephBackend::RadosClient::RadosClient(string nm, string _conf, CephBackend *_cep
     
 }
 	
-int CephBackend::RadosClient::init()
+int CephBackend::RadosClient::init(int create = 0)
 {
     int r;
     cerr<<"start to connect rados:"<<radosname<<endl;
-	/*
+  if(create == 1){
 
     r= rados_create(&cluster ,NULL);
     if(r< 0){
@@ -63,27 +63,26 @@ int CephBackend::RadosClient::init()
         cerr<<"create rados ioctx failed:"<<radosname<<" r="<<r<<endl;
         return r;
     }  
-	*/
-
+  }
     return 0;
 }
 
 
-int CephBackend::RbdVolume::init()
+int CephBackend::RbdVolume::init(int create = 0)
 {
     int r;
     cerr<<"init rbd: "<<rbdname<<" pipemq"<<endl;
     
     //mq.insert(pari<string ,void *>("mq", sendq));
-    cerr<<"start to connect rbd:"<<rbdname<<endl;
+    //cerr<<"start to connect rbd:"<<rbdname<<endl;
     
-/*
-    r = rbd_open(rados->ioctx, rbdname.c_str(), &image , NULL);
-    if(r< 0){
-        cerr<<"open rbd volume failed:"<<rbdname<<" r="<<r<<endl;
-        return r;
-    }  
-*/
+    if(create == 1){
+        r = rbd_open(rados->ioctx, rbdname.c_str(), &image , NULL);
+        if(r< 0){
+            cerr<<"open rbd volume failed:"<<rbdname<<" r="<<r<<endl;
+            return r;
+        }  
+    }
     return 0;
 }
 int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c)
@@ -117,6 +116,45 @@ int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pd
     return 0;
 }
 
+void pdc_callback(rbd_completion_t cb, void *arg)
+{
+    int r;
+    
+    Msginfo *op = (Msginfo*)arg;
+    op->dump("pdc_callback");
+    cerr<<"server get rbd callback"<<endl;
+    op->ref_dec();
+    
+    if(op->isdone()){
+        CephBackend::RbdVolume *prbd = (CephBackend::RbdVolume *)op->volume;
+        if(! prbd) assert(0);
+        pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
+        r = p_pipe->push(op);
+    }
+    cerr<<"pdc_callback , now ref is:"<<op->ref << "  r="<<r<<endl;;
+
+}
+
+int CephBackend::RbdVolume::do_create_rbd_completion(void * op, rbd_completion_t *comp )
+{
+    int r;
+    
+    rbd_aio_create_completion(op,  pdc_callback, comp);
+
+return 0;
+}
+int CephBackend::RbdVolume::do_aio_write(void *_op,u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c)
+{
+    int r;
+    Msginfo* op= (Msginfo *)_op;
+    rbd_completion_t comp;
+    if(!image)  return -1;
+    op->ref_inc();
+    //do_create_rbd_completion(op ,&comp);
+    r = rbd_aio_write(image, offset, len, buf, c);
+
+}
+
 int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
 {
     int r;
@@ -144,19 +182,19 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
         }else{
             cerr<<"rbd "<< it->second<<" register now "<<endl;
             CephBackend::RbdVolume * rbd = new CephBackend::RbdVolume(it->second,itm->second);
-            if(rbd->init() < 0) return -1;
+            if(rbd->init(1) < 0) return -1;
             //vols[it->second] = rbd;
             vols.insert(pair<string ,RbdVolume*>(it->second ,rbd));
             p_rados->volumes[it->second] = (void *)rbd;
         }
     }else{
         CephBackend::RadosClient *rados = new CephBackend::RadosClient(it->first, "/etc/ceph/ceph.conf",this);
-        if(rados->init() < 0){
+        if(rados->init(1) < 0){
             return -1;
         }
         radoses[it->first] = rados;
         CephBackend::RbdVolume * rbd = new CephBackend::RbdVolume(it->second,rados);
-        if(rbd->init() < 0) return -1;
+        if(rbd->init(1) < 0) return -1;
         
         r = pdcPipe::createserverqueues((void *)&msg->mqkeys,rbd->mq);
         if(r < 0){

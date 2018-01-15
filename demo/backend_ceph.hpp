@@ -43,7 +43,7 @@ public:
         callback_arg = cb_arg;
     }
 
-    int complate();
+    int complate(int r);
     
     
 };
@@ -68,7 +68,7 @@ public:
         RadosClient(string nm, string _conf,CephBackend *_ceph);
         ~RadosClient() {}
         const char * GetName() {return radosname.c_str();}
-        int init();
+        int init(int create);
     
     };
     class RbdVolume{
@@ -85,9 +85,13 @@ public:
             //pipe(rbdname.c_str(), 12, PIPEWRITE, PIPECLIENT) 
             {}
         ~RbdVolume() {}  //todo close pipe
-        int init();
+        int init(int create);
         const char * GetName() {return rbdname.c_str();}
         int aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t cb);
+        //static void pdc_callback(rbd_completion_t cb, void *arg);
+        int do_create_rbd_completion(void * op, rbd_completion_t *comp );
+        int do_aio_write(void *_op,u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c);
+
     };
     map<string , RadosClient*> radoses;
     map<string , RbdVolume *>  vols;
