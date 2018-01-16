@@ -212,6 +212,14 @@ void demo_completion(pdc_rbd_completion_t c,void *arg)
     cerr<<"end time is:"<<endtime.tv_sec<<"s + "<<endtime.tv_usec<<" us"<<endl;
 }
 
+int pdc_rbd_aio_wait_for_complete(pdc_rbd_completion_t c)
+{
+    PdcCompletion *comp = (PdcCompletion*)c;
+
+    comp->wait_for_complete();
+    return 0;
+}
+
 int main()
 {
     int r = 0;
@@ -265,7 +273,10 @@ int main()
     }
     retry--;
     }
-    sleep(2);
+    //sleep(2);
+    cerr<<"wait for 5 start:"<<endl;
+    pdc_rbd_aio_wait_for_complete( c[5]);
+    cerr<<"wait for 5 end:"<<endl;
     retry = 5;
     while(retry){
       pdc_aio_release(c[retry]);

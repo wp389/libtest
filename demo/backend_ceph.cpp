@@ -8,16 +8,25 @@
 
 
 PdcCompletion::PdcCompletion(pdc_callback_t cb, void *cb_arg, void *c):
-    comp(c)
+    comp(c),lock("PdcCompletion"),done(false)
 {
+
     callback = cb;
     callback_arg = cb_arg;
 }
 
 PdcCompletion::PdcCompletion(void *c):
-    comp(c)
+    comp(c),lock("PdcCompletion"),done(false)
 {
     
+}
+int PdcCompletion::wait_for_complete()
+{
+    lock.lock();
+    while (!done)
+      cond.wait(lock);
+    lock.unlock();
+return 0;
 }
 
 int PdcCompletion::complate(int r)
@@ -25,10 +34,12 @@ int PdcCompletion::complate(int r)
     //cerr<<"pdc complate op:"<<opidx<<endl;
 
     retcode = r;
+    
     cerr<<"client get rbd return value :"<< retcode <<endl;
     if(callback)
         callback(comp,callback_arg);
-
+    done = true;
+    cond.Signal();
     
     return 0;
 }

@@ -12,7 +12,7 @@
 #include <rados/librados.h>
 #endif
 
-
+#include "pdc_lock.hpp"
 
 //#include "shmmem.hpp"
 //#include "pipe.hpp"
@@ -27,6 +27,8 @@ typedef void (*pdc_callback_t)(pdc_rbd_completion_t c, void *arg);
 //(librbd::RBD::AioCompletion *)
 struct PdcCompletion{
     void * comp;  //(librbd::RBD::AioCompletion *)
+    PdcLock lock;
+    PdcCond cond;
     void *read_buf;
     void *write_buf;
     u64  buflen;
@@ -35,6 +37,8 @@ struct PdcCompletion{
     Msginfo *op;
     pdc_callback_t callback;
     void * callback_arg;
+    bool done;
+    
 public:
     PdcCompletion(pdc_callback_t cb, void *cb_arg, void *c);
     PdcCompletion(void *c);
@@ -45,7 +49,7 @@ public:
     }
 
     int complate(int r);
-    
+    int wait_for_complete();
     void release(){
         //lock;
         //NEED todo?

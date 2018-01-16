@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
-//#include <malloc.h>
+#include <malloc.h>
 #include <stdlib.h>
 #include <memory.h>
 
