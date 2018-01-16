@@ -37,6 +37,12 @@ int pdc_rados_conf_read_file(pdc_rados_t vmclient, const char * path)
     return r ;
 }
 
+int pdc_rados_conf_set(pdc_rados_t cluster, const char *option, const char *value)
+{
+    cerr<<"pdc_rados_conf_set is null now"<<endl;
+    return 0;
+}
+
 int pdc_connect_rados(pdc_rados_t vmclient)
 {
     PdcClient * pclient = reinterpret_cast<PdcClient *>(vmclient);
@@ -53,25 +59,26 @@ int pdc_rados_ioctx_create(pdc_rados_t vmclient, const char *pool_name,
     PdcClient * pclient = reinterpret_cast<PdcClient *>(vmclient);
     
     CephBackend *pceph = pclient->clusters["ceph"];
-    
-    Msginfo *msg = new Msginfo();
-    msg->opcode = OPEN_RADOS;
-    strcpy(msg->client.cluster,"ceph");
-    strcpy(msg->client.pool,pool_name);
-    
 
-    strcpy(msg->mqkeys.key , pclient->ackmq->Getkeys());
-    msg->mqkeys.semkey= pclient->ackmq->GetSemKey();
-    msg->dump("open rados");
-    r = pclient->msgmq.push(msg);
-    if(r<  0 ){
-        cerr<<" create remote rados failed"<<endl;
-        return -1;
-    }
     map<string ,CephBackend::RadosClient *>::iterator it = pceph->radoses.find(radosname);
     if(it == pceph->radoses.end()){  // not exist ,create a new one
         prados = new CephBackend::RadosClient(radosname, "/etc/ceph/ceph.conf",pceph);
         pceph->radoses[radosname] = prados;
+            
+        Msginfo *msg = new Msginfo();
+        msg->opcode = OPEN_RADOS;
+        strcpy(msg->client.cluster,"ceph");
+        strcpy(msg->client.pool,pool_name);
+    
+
+        strcpy(msg->mqkeys.key , pclient->ackmq->Getkeys());
+        msg->mqkeys.semkey= pclient->ackmq->GetSemKey();
+        msg->dump("open rados");
+        r = pclient->msgmq.push(msg);
+        if(r<  0 ){
+            cerr<<" create remote rados failed"<<endl;
+            return -1;
+        }
     }else{
     prados = pceph->radoses[radosname];
     assert(prados);
@@ -84,7 +91,25 @@ int pdc_rados_ioctx_create(pdc_rados_t vmclient, const char *pool_name,
     return 0;
 }
 
+void pdc_rados_ioctx_destroy(pdc_rados_ioctx_t io)
+{
+    cerr<<"pdc_rados_ioctx_destroy is null now"<<endl;
 
+    
+}
+
+
+
+void pdc_rados_shutdown(pdc_rados_t cluster)
+{
+    cerr<<"pdc_rados_shutdown is null now"<<endl;
+    return ;
+}
+ssize_t pdc_rbd_aio_get_return_value(pdc_rbd_completion_t c)
+{
+    PdcCompletion *comp = (PdcCompletion*)c;
+    return comp->retcode; 
+}
 
 int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rbd_name)
 {
@@ -115,8 +140,7 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
         }
         *image = (void *)prbd;
         prados->volumes[rbdname] = (void *)prbd;
-    }
-
+		
     pdcPipe::PdcPipe<Msginfo>::ptr recvmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[RECVMQ]);
     //msginfo will change to msgpool list  next step
     Msginfo *msg = new Msginfo();
@@ -138,10 +162,21 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
         return -1;
     }
     
+    }
+
     cerr<<"pdc create rbd over"<<endl;
     return 0;
 
 }
+
+
+int pdc_rbd_close(pdc_rbd_image_t image)
+{
+    
+    
+    return 0;
+}
+
 int pdc_create_aio_complation(void *cb_arg, pdc_callback_t  cb,pdc_rbd_completion_t *c)
 {
     PdcCompletion *comp = new PdcCompletion(cb, cb_arg, (void*)c);
@@ -160,11 +195,18 @@ int pdc_rbd_aio_write(pdc_rbd_image_t image, u64 off, size_t len,
     return 0;
 }
 
+void pdc_aio_release(pdc_rbd_completion_t c)
+{
+    PdcCompletion *comp = (PdcCompletion*)c;
+    comp->release();
+
+}
 void demo_completion(pdc_rbd_completion_t c,void *arg)
 {
+    PdcCompletion *comp = (PdcCompletion*)c;
     struct timeval endtime;
     cerr<<" IO finished:"<<*(int*)arg<<endl;
-    rbd_aio_release(c);
+    
     ::gettimeofday(&endtime, NULL);
     
     cerr<<"end time is:"<<endtime.tv_sec<<"s + "<<endtime.tv_usec<<" us"<<endl;
@@ -203,19 +245,32 @@ int main()
         cerr<<"create prados failed "<<endl;
         return -1;
     }	   
-    pdc_rbd_completion_t c;
-    ::gettimeofday(&starttime, NULL);
-    cerr<<"start time is:"<<starttime.tv_sec<<"s + "<<starttime.tv_usec<<" us";
-    r = pdc_create_aio_complation((void *)&id,demo_completion, & c);
+
+    int retry =5;
+    int idx[retry+1];
     char *buf = (char *)malloc(1024);
-    r = pdc_rbd_aio_write(img, 0, 1024, buf,c);
+    
+    pdc_rbd_completion_t c[retry+1];
+    while(retry){
+    idx[retry]=retry;
+    ::gettimeofday(&starttime, NULL);
+    cerr<<"start time is:"<<starttime.tv_sec<<"s + "<<starttime.tv_usec<<" us"<<endl;;
+    r = pdc_create_aio_complation((void *)&(idx[retry]),demo_completion, & c[retry]);
+    
+    r = pdc_rbd_aio_write(img, retry*1048576, 1024, buf,c[retry]);
     if(r< 0){
         cerr<<"rbd write failed"<<endl;
-        free(buf);
+        //free(buf);
         return -1;
     }
-
-    
+    retry--;
+    }
+    sleep(2);
+    retry = 5;
+    while(retry){
+      pdc_aio_release(c[retry]);
+      retry--;
+    }
     sleep(1000);
     return 0;
 }

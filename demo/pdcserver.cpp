@@ -29,16 +29,16 @@ void* Pdcserver::Iothreads::_process()
             continue;
         }
         Msginfo *op = pdc->ops.front();
+        pdc->ops.pop_front();
+        pthread_mutex_unlock(&pdc->iomutex);
+
+        op->dump("server io tp op");
         vol = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
         if(!vol){
             op->dump("get NULL volume");
             cerr<<"get NULL volume"<<endl; 
             continue;
         }
-        pdc->ops.pop_front();
-        pthread_mutex_unlock(&pdc->iomutex);
-        op->dump("server io tp op");
-
         rbd_completion_t comp;
         u64 off = op->data.offset;
         u32 bufsize = op->data.len;
@@ -52,15 +52,6 @@ void* Pdcserver::Iothreads::_process()
             vol->do_aio_write(op, off+ i*sizeof(simpledata), lengh, (char *)pdata, comp);   
         }
         
-        if(0){
-        //TODO: here ,we connect rados  and write rbd
-        op->return_code = 0;
-        if(op->opcode == PDC_AIO_WRITE) op->opcode =  RW_W_FINISH;
-        cerr<<"do io:"<< vol->GetName() <<endl;
-        pthread_mutex_lock(&pdc->finimutex);
-        pdc->finishop.push_back(op);
-        pthread_mutex_unlock(&pdc->finimutex);
-       }
     }
 
     return 0;
@@ -74,38 +65,24 @@ void* Pdcserver::Finisherthreads::_process()
     Pdcserver *pdc = (Pdcserver *)server;
     CephBackend::RbdVolume *prbd;
     pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
-    cerr<<"Fnisher thread "<<pthread_self()<<" start"<<endl;
+    cerr<<"listen thread "<<pthread_self()<<" start"<<endl;
     
     while(1){
         if(stop()) continue;
-        
-        pthread_mutex_lock(&pdc->finimutex);
-        if(pdc->finishop.empty()){
-            pthread_mutex_unlock(&pdc->finimutex);
+        Msginfo *msg = pdc->msgmq.pop();
+        if(!msg){
             continue;
         }
-        Msginfo *op = pdc->finishop.front();
-        pdc->finishop.pop_front();
-        pthread_mutex_unlock(&pdc->finimutex);
-        op->dump("server finish tp op");
-        //cerr<<" get a finish op ,do pop"<<endl;
-        op->return_code = 0;
-        //free shared memory
-        prbd = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
-        //TODO: here ,we connect rados  and write rbd
-        op->return_code = 0;
-        if(prbd)
-            p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >(prbd->mq[SENDMQ]);
-        else
-            assert(0);
-        if(op->opcode == PDC_AIO_WRITE) op->opcode =  RW_W_FINISH;
-        r = p_pipe->push(op);
+        Msginfo *op = new Msginfo();
+        op->copy(msg);
+        pdc->msgmq.clear();
+        pthread_mutex_lock(&pdc->msgmutex);
+        pdc->msgop.push_back(op);
+        pthread_mutex_unlock(&pdc->msgmutex);
         sum++;
-        if(r < 0){
-            cerr<<"done op id:"<<sum<<" failed"<<endl;
-	     continue;
-        }
-		
+        //op->dump("server finish tp op");
+        //cerr<<" get a finish op ,do pop"<<endl;
+        		
     }
 
 return 0;
@@ -116,21 +93,31 @@ return 0;
 void* Pdcserver::Msgthreads::_process()
 {
     int r;
+    u64 sum = 0;
+    CephBackend::RbdVolume *vol;
     Pdcserver *pdc = (Pdcserver *)server;
     cerr<<"MSGthread "<<pthread_self()<<" start"<<endl;
 
     while(1){
         if(stop() ) continue;
-        Msginfo *msg = pdc->msgmq.pop();
-        if(!msg){
-            ///cerr<<"msg thread get NULL msg"<<endl;;
-            //assert(0);
+        pthread_mutex_lock(&pdc->msgmutex);
+        if(pdc->msgop.empty()){
+            pthread_mutex_unlock(&pdc->msgmutex);
             continue;
         }
-        //performace->perf
-        r = 0;
-        //r = do_op(msg);
+        Msginfo *msg = pdc->msgop.front();
+        pdc->msgop.pop_front();
+        pthread_mutex_unlock(&pdc->msgmutex);
+
+/*
+        Msginfo *msg = pdc->msgmq.pop();
+        if(!msg){
+            
+            continue;
+        }
+*/
         if(msg){
+            sum++;
             assert(msg);
             msg->dump("server msg tp op");
             std::map<string,string> client;

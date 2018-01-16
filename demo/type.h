@@ -16,7 +16,9 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
-#include <malloc.h>
+//#include <malloc.h>
+#include <stdlib.h>
+#include <memory.h>
 
 #define LOCALTEST 1
 //#include "pipe.hpp"
@@ -256,7 +258,8 @@ struct  Msginfo{
     void * volume;		//rbd volume info in client or server
     int return_code;
 	
-    Msginfo():sw(true),remote_pid(0),return_code(0),ref(0) {pid = getpid(); opid = ++msgid;};
+    Msginfo():sw(true),opid(0),remote_pid(0),return_code(0),ref(0) {pid = getpid(); };
+    void getopid() {opid = ++msgid;}
     void ref_inc() {ref++;}
     void ref_dec() {ref--;}
     bool isdone() {return ref == 0;}
@@ -268,6 +271,10 @@ struct  Msginfo{
             this->data = m->data;
             this->originbuf = m->originbuf;
             this->op = m->op;
+            this->opid = m->opid;
+            //copy pipe keys:
+            ::memcpy(this->mqkeys.key, m->mqkeys.key, sizeof(m->mqkeys.key));
+            this->mqkeys.semkey = m->mqkeys.semkey;
             //this->volume = m->volume;   
             this->return_code = m->return_code;
         }

@@ -93,6 +93,7 @@ void* PdcClient::Finisherthreads::_process()
         if(op){
             msg = new Msginfo();
             msg->copy(op);
+            p_pipe->clear();
         }else{
             continue;
         }
@@ -101,7 +102,7 @@ void* PdcClient::Finisherthreads::_process()
             msg->dump("client finish tp op");
             if(msg->opcode == ACK_MEMORY){
                 msg->opcode = PDC_AIO_WRITE;
-                p_pipe->clear();
+                //p_pipe->clear();
                 
                 msg->dump("get memory ack, todo RW");
                 pdc->OpFindClient(msg);
@@ -115,7 +116,7 @@ void* PdcClient::Finisherthreads::_process()
                 PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);
                 if(c && c->callback){
                     ///c->callback(c->comp, c->callback_arg);
-                    c->complate(0);
+                    c->complate(msg->return_code);
                     //todo put shmmemory keys .  
                     vector<u64> index(op->data.indexlist,op->data.indexlist+sizeof(op->data.indexlist)/sizeof(u64));
                     pdc->release_shmkey(index);
@@ -176,6 +177,7 @@ void* PdcClient::Msgthreads::_process()
 
         Msginfo *msg =  pdc->msgop.front();
         pdc->msgop.pop_front();
+        
         pthread_mutex_unlock(&pdc->msgmutex);
         if(!msg){
             cerr<<"msg thread get NULL msg"<<endl;;
@@ -210,7 +212,7 @@ void* PdcClient::Msgthreads::_process()
                 msg->opcode =GET_MEMORY;
                 list<u64> listadd ;
                 //TODO:SET START TIME
-                
+                msg->getopid();
                 cerr<<"start to get memory"<<endl;
                 p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
                 assert(p_pipe);
@@ -263,10 +265,10 @@ void* PdcClient::Msgthreads::_process()
         
     }
 
-return NULL;
 
 }
 
+return NULL;
 }
 
 int PdcClient::init()

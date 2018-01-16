@@ -246,7 +246,7 @@ public:
                         //T *t = new T();
 			    while(r  <= 0)		
                         r = ::read(fd, t ,sizeof(T));  //block
-				
+                        
                         if(r == sizeof(T)){
                             return t;
                         }
