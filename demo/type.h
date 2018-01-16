@@ -256,7 +256,7 @@ struct  Msginfo{
     void * volume;		//rbd volume info in client or server
     int return_code;
 	
-    Msginfo():sw(true),remote_pid(0),return_code(-1),ref(0) {pid = getpid(); opid = ++msgid;};
+    Msginfo():sw(true),remote_pid(0),return_code(0),ref(0) {pid = getpid(); opid = ++msgid;};
     void ref_inc() {ref++;}
     void ref_dec() {ref--;}
     bool isdone() {return ref == 0;}

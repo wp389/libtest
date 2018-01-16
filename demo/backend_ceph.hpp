@@ -32,6 +32,7 @@ struct PdcCompletion{
     u64  buflen;
     int   retcode;
     u64 opidx;
+    Msginfo *op;
     pdc_callback_t callback;
     void * callback_arg;
 public:
@@ -106,5 +107,8 @@ public:
 };
 
 
+
+
+//int release_shmkey(vector<u64> & indexlist );
 
 #endif

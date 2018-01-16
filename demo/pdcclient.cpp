@@ -116,7 +116,10 @@ void* PdcClient::Finisherthreads::_process()
                 if(c && c->callback){
                     ///c->callback(c->comp, c->callback_arg);
                     c->complate(0);
-                
+                    //todo put shmmemory keys .  
+                    vector<u64> index(op->data.indexlist,op->data.indexlist+sizeof(op->data.indexlist)/sizeof(u64));
+                    pdc->release_shmkey(index);
+
                 }
                 delete msg;
             }

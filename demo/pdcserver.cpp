@@ -98,6 +98,7 @@ void* Pdcserver::Finisherthreads::_process()
             p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >(prbd->mq[SENDMQ]);
         else
             assert(0);
+        if(op->opcode == PDC_AIO_WRITE) op->opcode =  RW_W_FINISH;
         r = p_pipe->push(op);
         sum++;
         if(r < 0){

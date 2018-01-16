@@ -22,8 +22,7 @@ PdcCompletion::PdcCompletion(void *c):
 
 int PdcCompletion::complate(int r)
 {
-
-    cerr<<"pdc complate op:"<<opidx<<endl;
+    //cerr<<"pdc complate op:"<<opidx<<endl;
     if(callback)
         callback(comp,callback_arg);
 
@@ -116,6 +115,9 @@ int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pd
     return 0;
 }
 
+
+
+
 void pdc_callback(rbd_completion_t cb, void *arg)
 {
     int r;
@@ -124,7 +126,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
     op->dump("pdc_callback");
     cerr<<"server get rbd callback"<<endl;
     op->ref_dec();
-    
+    op->return_code |= rbd_aio_get_return_value(cb);
     if(op->isdone()){
         CephBackend::RbdVolume *prbd = (CephBackend::RbdVolume *)op->volume;
         if(! prbd) assert(0);
@@ -132,7 +134,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
         pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
         r = p_pipe->push(op);
     }
-    cerr<<"pdc_callback , now ref is:"<<op->ref << "  r="<<r<<endl;;
+    cerr<<"pdc_callback , now ref is:"<<op->ref << "  return_code ="<<op->return_code<<endl;;
 
 }
 
@@ -154,6 +156,7 @@ int CephBackend::RbdVolume::do_aio_write(void *_op,u64 offset, size_t len,const 
     //do_create_rbd_completion(op ,&comp);
     r = rbd_aio_write(image, offset, len, buf, c);
 
+return r;
 }
 
 int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)

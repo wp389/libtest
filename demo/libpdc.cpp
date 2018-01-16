@@ -160,15 +160,14 @@ int pdc_rbd_aio_write(pdc_rbd_image_t image, u64 off, size_t len,
     return 0;
 }
 
-
-
 void demo_completion(pdc_rbd_completion_t c,void *arg)
 {
     struct timeval endtime;
     cerr<<" IO finished:"<<*(int*)arg<<endl;
- 
+    rbd_aio_release(c);
     ::gettimeofday(&endtime, NULL);
-    cerr<<"end time is:"<<endtime.tv_sec<<"s + "<<endtime.tv_usec<<" us";
+    
+    cerr<<"end time is:"<<endtime.tv_sec<<"s + "<<endtime.tv_usec<<" us"<<endl;
 }
 
 int main()
@@ -215,6 +214,7 @@ int main()
         free(buf);
         return -1;
     }
+
     
     sleep(1000);
     return 0;
