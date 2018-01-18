@@ -16,11 +16,11 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
-#include <malloc.h>
+//#include <malloc.h>
 #include <stdlib.h>
 #include <memory.h>
 
-#define LOCALTEST 1
+//#define LOCALTEST 1
 //#include "pipe.hpp"
 typedef unsigned long long u64;
 typedef unsigned long u32;

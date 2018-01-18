@@ -110,7 +110,7 @@ private:
     };
 
 
-static const uint32_t SHMSIZE = 1024*1024*16+24;
+static const uint32_t SHMSIZE = 1024*1024*1024+1024;
 //测试将大小调小，实际使用时应该设大避免影响性能
 
 class SuperBlock {
@@ -153,6 +153,7 @@ public:
         if (m_iShmId < 0) {
             m_iCreate = 1;
             m_iShmId = ::shmget(m_key, SHMSIZE, IPC_CREAT);
+            
         }
         if (m_iShmId < 0) {
             m_sErrMsg.clear();
@@ -175,7 +176,7 @@ public:
                 cerr<<"init to memory queue model"<<endl;
                 //QueueHead Head;
                 sb->ItemSize= sizeof(T);
-                sb->AllSize = SHMSIZE - 20;
+                sb->AllSize = SHMSIZE  - 1024;
                 sb->AllCount = sb->AllSize / sb->ItemSize;
                 sb->DataCount = 0;
                 sb->Front = 0;

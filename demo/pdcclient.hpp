@@ -5,7 +5,7 @@
 //#include "type.h"
 //#include "shmmem.hpp"
 //#include "pipe.hpp"
-#include "backend_ceph.hpp"
+#include "backend_client.hpp"
 #include "shmmem.hpp"
 #include "pipe.hpp"
 #include "type.h"
@@ -21,6 +21,7 @@ using namespace pdcPipe;
 typedef void*  pdc_rados_ioctx_t;
 typedef void*  pdc_rados_t;
 typedef void*  pdc_rbd_image_t;
+
 
 
 
@@ -42,7 +43,7 @@ public:
     list<Msginfo> queue_ms;
     Perfs *performace;
     ShmMem<simpledata> slab;
-    map<string,CephBackend *> clusters;
+    map<string,BackendClient *> clusters;
 	
 public:
     class Iothreads :public Threadpool{

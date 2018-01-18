@@ -1,26 +1,26 @@
 Undefined symbols for architecture x86_64:
   "_rados_conf_read_file", referenced from:
-      CephBackend::RadosClient::init(int) in backend_ceph-7dae16.o
+      CephBackend::RadosClient::init(int) in backend_ceph-ae54f7.o
      (maybe you meant: __Z24pdc_rados_conf_read_filePvPKc)
   "_rados_connect", referenced from:
-      CephBackend::RadosClient::init(int) in backend_ceph-7dae16.o
+      CephBackend::RadosClient::init(int) in backend_ceph-ae54f7.o
   "_rados_create", referenced from:
-      CephBackend::RadosClient::init(int) in backend_ceph-7dae16.o
+      CephBackend::RadosClient::init(int) in backend_ceph-ae54f7.o
   "_rados_ioctx_create", referenced from:
-      CephBackend::RadosClient::init(int) in backend_ceph-7dae16.o
+      CephBackend::RadosClient::init(int) in backend_ceph-ae54f7.o
      (maybe you meant: __Z22pdc_rados_ioctx_createPvPKcPS_)
   "_rbd_aio_create_completion", referenced from:
-      CephBackend::RbdVolume::do_create_rbd_completion(void*, void**) in backend_ceph-7dae16.o
+      CephBackend::RbdVolume::do_create_rbd_completion(void*, void**) in backend_ceph-ae54f7.o
   "_rbd_aio_get_return_value", referenced from:
-      pdc_callback(void*, void*) in backend_ceph-7dae16.o
+      pdc_callback(void*, void*) in backend_ceph-ae54f7.o
      (maybe you meant: __Z28pdc_rbd_aio_get_return_valuePv)
   "_rbd_aio_release", referenced from:
-      pdc_callback(void*, void*) in backend_ceph-7dae16.o
+      pdc_callback(void*, void*) in backend_ceph-ae54f7.o
   "_rbd_aio_write", referenced from:
-      CephBackend::RbdVolume::do_aio_write(void*, unsigned long long, unsigned long, char const*, void*) in backend_ceph-7dae16.o
+      CephBackend::RbdVolume::do_aio_write(void*, unsigned long long, unsigned long, char const*, void*) in backend_ceph-ae54f7.o
      (maybe you meant: __Z17pdc_rbd_aio_writePvymPKcS_)
   "_rbd_open", referenced from:
-      CephBackend::RbdVolume::init(int) in backend_ceph-7dae16.o
+      CephBackend::RbdVolume::init(int) in backend_ceph-ae54f7.o
      (maybe you meant: __Z12pdc_rbd_openPvPS_PKc)
 ld: symbol(s) not found for architecture x86_64
 clang: error: linker command failed with exit code 1 (use -v to see invocation)

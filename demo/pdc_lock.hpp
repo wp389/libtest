@@ -56,6 +56,7 @@ public:
     }
     int Signal(){
         int r = pthread_cond_broadcast(&_cond);
+        return r;
     }
 };
 

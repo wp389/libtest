@@ -1,25 +1,17 @@
 #pragma once
-#ifndef __BACKEND_CEPH_HPP_
-#define __BACKEND_CEPH_HPP_
+#ifndef __BACKEND_CLIENT_HPP_
+#define __BACKEND_CLIENT_HPP_
 
 #include "type.h"
 
-#ifdef LOCALTEST
-#include "rbd/librbd.h"
-#include "rados/librados.h"
-#else
-#include <rbd/librbd.h>
-#include <rados/librados.h>
-#endif
 #include "completion.hpp"
 #include "pdc_lock.hpp"
 
-//#include "shmmem.hpp"
-//#include "pipe.hpp"
 
 using namespace std;
 
-class CephBackend{
+
+class BackendClient{
     string name;
     string _confpath;
 public:
@@ -30,13 +22,11 @@ public:
         string radosname;
         string confpath;
     public:
-        CephBackend *ceph;
+        BackendClient *ceph;
     public:
-        rados_t cluster;
-        rados_ioctx_t ioctx;
         map<string , void *> volumes;
     public:
-        RadosClient(string nm, string _conf,CephBackend *_ceph);
+        RadosClient(string nm, string _conf,BackendClient *_ceph);
         ~RadosClient() {}
         const char * GetName() {return radosname.c_str();}
         int init(int create);
@@ -45,9 +35,7 @@ public:
     class RbdVolume{
         string rbdname;
         RadosClient *rados;
-        rbd_image_t image;
 
-        //Pipe<Msginfo> pipe;
     public:
             map<string ,void*>mq;
     public:
@@ -60,8 +48,8 @@ public:
         const char * GetName() {return rbdname.c_str();}
         int aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t cb);
         //static void pdc_callback(rbd_completion_t cb, void *arg);
-        int do_create_rbd_completion(void * op, rbd_completion_t *comp );
-        int do_aio_write(void *_op,u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c);
+        //int do_create_rbd_completion(void * op, rbd_completion_t *comp );
+        //int do_aio_write(void *_op,u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c);
 
     };
     map<string , RadosClient*> radoses;
@@ -70,15 +58,11 @@ public:
 
 
 public:
-    CephBackend(string nm, string confpath, list<Msginfo *>* msgop);
-    ~CephBackend();
-    int register_client(map<string,string > &vmclient, Msginfo *msg);
+    BackendClient(string nm, string confpath, list<Msginfo *>* msgop);
+    ~BackendClient() {}
+
     void *findclient(map<string, string> *opclient);
 };
 
-
-
-
-//int release_shmkey(vector<u64> & indexlist );
 
 #endif

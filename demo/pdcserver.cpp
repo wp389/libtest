@@ -16,6 +16,7 @@ int Pdcserver::Iothreads::do_op(void * data)
 void* Pdcserver::Iothreads::_process()
 {
     int r = 0;
+    u64 sum =0;
     Pdcserver *pdc = (Pdcserver *)server;
     CephBackend::RbdVolume *vol;
     cerr<<"IOthread "<<pthread_self()<<" start"<<endl;
@@ -39,6 +40,7 @@ void* Pdcserver::Iothreads::_process()
             cerr<<"get NULL volume"<<endl; 
             continue;
         }
+        sum++;
         rbd_completion_t comp;
         u64 off = op->data.offset;
         u32 bufsize = op->data.len;
@@ -51,7 +53,7 @@ void* Pdcserver::Iothreads::_process()
             lengh = bufsize > sizeof(simpledata) ? sizeof(simpledata):bufsize;
             vol->do_aio_write(op, off+ i*sizeof(simpledata), lengh, (char *)pdata, comp);   
         }
-        
+        cerr<<"do rbd write---------:"<<sum<<endl;
     }
 
     return 0;
@@ -165,9 +167,9 @@ void* Pdcserver::Msgthreads::_process()
                 op->pid = msg->pid; // client pid;
                 */
                 pdc->OpFindClient(msg);
-                pthread_mutex_lock(&pdc->msgmutex);
+                pthread_mutex_lock(&pdc->iomutex);
                 server->ops.push_back(msg);
-                pthread_mutex_unlock(&pdc->msgmutex);
+                pthread_mutex_unlock(&pdc->iomutex);
                 
             }
 
@@ -201,6 +203,7 @@ int Pdcserver::init()
     ret = slab.Init();
     if(ret < 0){
         cerr<<"slab init faled:"<<ret<<endl;
+        return -1;
     }
 
     //msgmq = new wp::Pipe::Pipe(PIPEKEY, MEMQSEM, PIPEREAD,wp::Pipe::SYS_t::PIPESERVER);
@@ -219,10 +222,12 @@ int Pdcserver::init()
     pthread_mutex_init(&finimutex,NULL);
     finisher = new Finisherthreads("Finisher threadpool", this);
     finisher->init(1);	
-    //register_client();
     ops.clear();
+    ops.resize(100000);
     finishop.clear();
+    finishop.resize(100000);
     msgop.clear();
+    msgop.resize(100000);
 
     finisher->start();
     iothread->start();

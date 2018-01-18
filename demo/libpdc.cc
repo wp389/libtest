@@ -4,12 +4,13 @@
 #include <iostream>
 #include <sstream>
 
+#include "librbd.hpp"
 #include "pdcclient.hpp"
 
 PdcClient *pdc_client_mgr;
 
-
-int pdc_create_rados(pdc_rados_t *prados)
+extern "C" int rados_create(rados_t *prados)
+//int pdc_create_rados(pdc_rados_t *prados)
 {
     int r;
     PdcClient * vmclient;
@@ -28,7 +29,8 @@ int pdc_create_rados(pdc_rados_t *prados)
     return 0;
 }
 
-int pdc_rados_conf_read_file(pdc_rados_t vmclient, const char * path)
+extern "C" int rados_conf_read_file(rados_t cluster, const char *path_list)
+//int pdc_rados_conf_read_file(pdc_rados_t vmclient, const char * path)
 {
     int r =0;
     //todo:
@@ -37,32 +39,35 @@ int pdc_rados_conf_read_file(pdc_rados_t vmclient, const char * path)
     return r ;
 }
 
-int pdc_rados_conf_set(pdc_rados_t cluster, const char *option, const char *value)
+extern "C" int rados_conf_set(rados_t cluster, const char *option, const char *value)
+//int pdc_rados_conf_set(pdc_rados_t cluster, const char *option, const char *value)
 {
     cerr<<"pdc_rados_conf_set is null now"<<endl;
     return 0;
 }
 
-int pdc_connect_rados(pdc_rados_t vmclient)
+extern "C" int rados_connect(rados_t cluster)
+//int pdc_connect_rados(pdc_rados_t vmclient)
 {
-    PdcClient * pclient = reinterpret_cast<PdcClient *>(vmclient);
+    PdcClient * pclient = reinterpret_cast<PdcClient *>(cluster);
     cerr<<"pdc_connect_rados "<<endl;
     return 0;
 }
 
-int pdc_rados_ioctx_create(pdc_rados_t vmclient, const char *pool_name,
-                                  pdc_rados_ioctx_t *ioctx)
+extern "C" int rados_ioctx_create(rados_t vmclient, const char *pool_name,
+//int pdc_rados_ioctx_create(pdc_rados_t vmclient, const char *pool_name,
+                                  rados_ioctx_t *ioctx)
 {
     int r;
-    CephBackend::RadosClient *prados;
+    BackendClient::RadosClient *prados;
     string radosname(pool_name);
     PdcClient * pclient = reinterpret_cast<PdcClient *>(vmclient);
     
-    CephBackend *pceph = pclient->clusters["ceph"];
+    BackendClient *pceph = pclient->clusters["ceph"];
 
-    map<string ,CephBackend::RadosClient *>::iterator it = pceph->radoses.find(radosname);
+    map<string ,BackendClient::RadosClient *>::iterator it = pceph->radoses.find(radosname);
     if(it == pceph->radoses.end()){  // not exist ,create a new one
-        prados = new CephBackend::RadosClient(radosname, "/etc/ceph/ceph.conf",pceph);
+        prados = new BackendClient::RadosClient(radosname, "/etc/ceph/ceph.conf",pceph);
         pceph->radoses[radosname] = prados;
             
         Msginfo *msg = new Msginfo();
@@ -91,7 +96,8 @@ int pdc_rados_ioctx_create(pdc_rados_t vmclient, const char *pool_name,
     return 0;
 }
 
-void pdc_rados_ioctx_destroy(pdc_rados_ioctx_t io)
+extern "C" void rados_ioctx_destroy(rados_ioctx_t io)
+//void pdc_rados_ioctx_destroy(pdc_rados_ioctx_t io)
 {
     cerr<<"pdc_rados_ioctx_destroy is null now"<<endl;
 
@@ -99,19 +105,23 @@ void pdc_rados_ioctx_destroy(pdc_rados_ioctx_t io)
 }
 
 
-
-void pdc_rados_shutdown(pdc_rados_t cluster)
+extern "C" void rados_shutdown(rados_t cluster)
+//void pdc_rados_shutdown(pdc_rados_t cluster)
 {
     cerr<<"pdc_rados_shutdown is null now"<<endl;
     return ;
 }
-ssize_t pdc_rbd_aio_get_return_value(pdc_rbd_completion_t c)
+
+extern "C" ssize_t rbd_aio_get_return_value(rbd_completion_t c)
+//ssize_t pdc_rbd_aio_get_return_value(rbd_completion_t c)
 {
     PdcCompletion *comp = (PdcCompletion*)c;
     return comp->retcode; 
 }
 
-int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rbd_name)
+extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *image,
+			const char *snap_name)
+//int pdc_rbd_open(rados_ioctx_t ioctx,rbd_image_t * image,const char * rbd_name)
 {
     int r;
     string pkey;
@@ -120,16 +130,16 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
     string poolname;
     PdcClient *pdcclient = pdc_client_mgr;
 
-    CephBackend::RbdVolume*prbd;
+    BackendClient::RbdVolume*prbd;
     //PdcClient * pclient = pdc_client_mgr;
-    CephBackend::RadosClient *prados = reinterpret_cast<CephBackend::RadosClient *>(ioctx);
+    BackendClient::RadosClient *prados = reinterpret_cast<BackendClient::RadosClient *>(ioctx);
 
     if(prados->volumes.find(rbdname) != prados->volumes.end()){  //exist
         cerr<<"find pdb exist"<<endl;
-        prbd = reinterpret_cast<CephBackend::RbdVolume*>(prados->volumes[rbdname]);
+        prbd = reinterpret_cast<BackendClient::RbdVolume*>(prados->volumes[rbdname]);
         
     }else {    //NOT EXIST
-        prbd = new CephBackend::RbdVolume(rbdname, prados);
+        prbd = new BackendClient::RbdVolume(rbdname, prados);
         
         pdcPipe::copymqs(prbd->mq, &pdcclient->msgmq,pdcclient->ackmq);     
         
@@ -170,38 +180,47 @@ int pdc_rbd_open(pdc_rados_ioctx_t ioctx,pdc_rbd_image_t * image,const char * rb
 }
 
 
-int pdc_rbd_close(pdc_rbd_image_t image)
+extern "C" int rbd_close(rbd_image_t image)
+//int pdc_rbd_close(pdc_rbd_image_t image)
 {
     
     
     return 0;
 }
-
-int pdc_create_aio_complation(void *cb_arg, pdc_callback_t  cb,pdc_rbd_completion_t *c)
+extern "C" int rbd_aio_create_completion(void *cb_arg,
+					 rbd_callback_t cb,
+					 rbd_completion_t *c)
+//int pdc_create_aio_complation(void *cb_arg, pdc_callback_t  cb,pdc_rbd_completion_t *c)
 {
     PdcCompletion *comp = new PdcCompletion(cb, cb_arg, (void*)c);
     *c = (void *)comp;
     return 0;;
 }
 
-int pdc_rbd_aio_write(pdc_rbd_image_t image, u64 off, size_t len,
-                         const char *buf ,pdc_rbd_completion_t c)
+extern "C" int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
+			     const char *buf, rbd_completion_t c)
+
+//int pdc_rbd_aio_write(pdc_rbd_image_t image, u64 off, size_t len,
+                         //const char *buf ,pdc_rbd_completion_t c)
 {
     int r;
-    CephBackend::RbdVolume*prbd = (CephBackend::RbdVolume*)image;
+    BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)image;
 
     r = prbd->aio_write(off,  len, buf, c);
     
     return 0;
 }
 
-void pdc_aio_release(pdc_rbd_completion_t c)
+extern "C" void rbd_aio_release(rbd_completion_t c)
+//void pdc_aio_release(pdc_rbd_completion_t c)
 {
     PdcCompletion *comp = (PdcCompletion*)c;
     comp->release();
 
 }
-void demo_completion(pdc_rbd_completion_t c,void *arg)
+
+/*
+extern "C" void demo_completion(pdc_rbd_completion_t c,void *arg)
 {
     PdcCompletion *comp = (PdcCompletion*)c;
     struct timeval endtime;
@@ -212,7 +231,20 @@ void demo_completion(pdc_rbd_completion_t c,void *arg)
     cerr<<"end time is:"<<endtime.tv_sec<<"s + "<<endtime.tv_usec<<" us"<<endl;
 }
 
-int pdc_rbd_aio_wait_for_complete(pdc_rbd_completion_t c)
+*/
+extern "C" int rbd_stat(rbd_image_t image, rbd_image_info_t *info,
+	                                size_t infosize)
+{
+    info->size = 1024*1024*1024;
+    info->obj_size = 1024*1024*4;
+    info->num_objs = 256;
+    info->order = 22;
+    strcpy(info->block_name_prefix, "rbd_data.");
+
+    return 0;
+}
+extern "C" int rbd_aio_wait_for_complete(rbd_completion_t c)
+//extern "C" int pdc_rbd_aio_wait_for_complete(pdc_rbd_completion_t c)
 {
     PdcCompletion *comp = (PdcCompletion*)c;
 
@@ -220,6 +252,7 @@ int pdc_rbd_aio_wait_for_complete(pdc_rbd_completion_t c)
     return 0;
 }
 
+/*
 int main()
 {
     int r = 0;
@@ -285,4 +318,5 @@ int main()
     sleep(1000);
     return 0;
 }
+*/
 
