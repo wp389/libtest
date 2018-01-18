@@ -230,6 +230,7 @@ public:
     *   but ,when use in multithreads ,a lock is needed.
     */
     int  get(u32 size, u64* sum){  //Get memory block, 
+        semLockGuard oLock(m_Sem);
         //list<u64> sum;
         int n =0;
         if (isFull() ) {
@@ -272,6 +273,7 @@ public:
             }
             
     	}
+	cerr<<""
        assert(sb->Inuse + sb->Avalid == sb->AllCount);
         return n;
         
@@ -285,6 +287,7 @@ public:
         return (T *)(m_pShm + sizeof(SuperBlock) + index * sizeof(T));
     }
     int put(vector<u64> &used){
+        semLockGuard oLock(m_Sem);
         freelist.assign(used.begin(), used.end());
         //freelist.splice(freelist.end(), used, used.begin(), used.end()); //for list
         sb->Avalid  += used.size();

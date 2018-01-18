@@ -97,7 +97,7 @@ int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pd
 void pdc_callback(rbd_completion_t cb, void *arg)
 {
     int r;
-    
+    //Pdcserver * pdc = pdc_server_mgr;
     Msginfo *op = (Msginfo*)arg;
     op->dump("pdc_callback");
     cerr<<"server get rbd callback"<<endl;
@@ -105,8 +105,18 @@ void pdc_callback(rbd_completion_t cb, void *arg)
     op->return_code |= rbd_aio_get_return_value(cb);
     if(op->isdone()){
         CephBackend::RbdVolume *prbd = (CephBackend::RbdVolume *)op->volume;
+        
         if(! prbd) assert(0);
-        if(op->opcode == PDC_AIO_WRITE) op->opcode =  RW_W_FINISH;
+        if(op->opcode == PDC_AIO_WRITE) {
+            op->opcode =  RW_W_FINISH;
+            //todo put shmmemory keys .  
+            /*
+            if(pdc){
+                vector<u64> index(op->data.indexlist,op->data.indexlist+sizeof(op->data.indexlist)/sizeof(u64));
+                pdc->release_shmkey(index);
+            }
+            */
+        }
         pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
         r = p_pipe->push(op);
     }

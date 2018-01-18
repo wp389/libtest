@@ -253,15 +253,12 @@ void* PdcClient::Msgthreads::_process()
                 cerr<<"op "<<op->opid<<" to ops queue"<<endl;
                 */
             }else if(msg->opcode == RW_W_FINISH){
-                cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
+                //cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
                 PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);
                 if(c && c->callback){
                     ///c->callback(c->comp, c->callback_arg);
                     c->complate(msg->return_code);
-                    //todo put shmmemory keys .  
-                    vector<u64> index(msg->data.indexlist,msg->data.indexlist+sizeof(msg->data.indexlist)/sizeof(u64));
-                    pdc->release_shmkey(index);
-
+                    
                 }
                 delete msg;
             }
@@ -291,7 +288,7 @@ int PdcClient::init()
     string state("init: ");
     cerr<<state<<"start thread:"<<endl;
 
-    BackendClient* pceph = new BackendClient("ceph","/etc/ceph/ceph.conf", &msgop);
+    BackendClient* pceph = new BackendClient("ceph","/etc/ceph/ceph.conf", &msgop, &msgmutex);
     clusters["ceph"] = pceph;
     //slab = new wp::shmMem::shmMem(MEMKEY, SERVERCREATE);
     ret = slab.Init();
@@ -332,7 +329,7 @@ int PdcClient::init()
     iothread->start();
     msgthread->start();
     
-    cerr<<"pdcserver init over"<<endl;
+    cerr<<"pdcclient init over"<<endl;
     return 0;
 }
 

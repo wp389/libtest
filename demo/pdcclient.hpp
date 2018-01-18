@@ -124,15 +124,8 @@ public:
     int init();
     void inc_ref() {ref ++;}
     void OpFindClient(Msginfo *&op);
-    int release_shmkey(vector<u64> & indexlist )
-    {
-        int r;
-		
-        r = slab.put(indexlist);
-        cerr<<"free usedlist :"<<r<<endl;
-        return r;
-    }
-       	
+
+ 	
 };
 
 

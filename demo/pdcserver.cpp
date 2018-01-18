@@ -6,6 +6,8 @@
 #include "pdcserver.hpp"
 //#include "backend_ceph.hpp"
 
+Pdcserver*pdc_server_mgr;
+
 int Pdcserver::Iothreads::do_op(void * data)
 {
     if( data)
@@ -34,6 +36,7 @@ void* Pdcserver::Iothreads::_process()
         pthread_mutex_unlock(&pdc->iomutex);
 
         op->dump("server io tp op");
+        OpFindClient(op);
         vol = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
         if(!vol){
             op->dump("get NULL volume");
@@ -53,7 +56,7 @@ void* Pdcserver::Iothreads::_process()
             lengh = bufsize > sizeof(simpledata) ? sizeof(simpledata):bufsize;
             vol->do_aio_write(op, off+ i*sizeof(simpledata), lengh, (char *)pdata, comp);   
         }
-        cerr<<"do rbd write---------:"<<sum<<endl;
+        //cerr<<"do rbd write---------:"<<sum<<endl;
     }
 
     return 0;
@@ -78,13 +81,24 @@ void* Pdcserver::Finisherthreads::_process()
         Msginfo *op = new Msginfo();
         op->copy(msg);
         pdc->msgmq.clear();
-        pthread_mutex_lock(&pdc->msgmutex);
-        pdc->msgop.push_back(op);
-        pthread_mutex_unlock(&pdc->msgmutex);
+
+        if(op){
+        op->dump("listen thread get op");
+        if(op->opcode == ACK_MEMORY){
+            op->opcode == PDC_AIO_WRITE;
+            pthread_mutex_lock(&pdc->iomutex);
+            pdc->ops.push_back(op);
+            pthread_mutex_unlock(&pdc->iomutex);
+        }
+        if(op->opcode == RW_W_FINISH){
+            pthread_mutex_lock(&pdc->msgmutex);
+            pdc->msgop.push_back(op);
+            pthread_mutex_unlock(&pdc->msgmutex);
+       }
         sum++;
         //op->dump("server finish tp op");
         //cerr<<" get a finish op ,do pop"<<endl;
-        		
+        }
     }
 
 return 0;
@@ -160,17 +174,13 @@ void* Pdcserver::Msgthreads::_process()
                 }
             }else if(msg->opcode == PDC_AIO_WRITE){
                 /*
-                PdcOp *op = new PdcOp(); 
-                op->data.len = msg->data.len;
-                op->data.indexlist.swap(msg->data.indexlist);
-                op->client = msg->client;
-                op->pid = msg->pid; // client pid;
-                */
+
                 pdc->OpFindClient(msg);
                 pthread_mutex_lock(&pdc->iomutex);
                 server->ops.push_back(msg);
                 pthread_mutex_unlock(&pdc->iomutex);
-                
+                */
+                assert(0);
             }
 
 
@@ -223,11 +233,8 @@ int Pdcserver::init()
     finisher = new Finisherthreads("Finisher threadpool", this);
     finisher->init(1);	
     ops.clear();
-    ops.resize(100000);
     finishop.clear();
-    finishop.resize(100000);
     msgop.clear();
-    msgop.resize(100000);
 
     finisher->start();
     iothread->start();
@@ -311,6 +318,7 @@ int main()
     cerr<<"pdc server start:"<<endl;
     Pdcserver *server = new Pdcserver("wp");
     r = server->init();
+    pdc_server_mgr = server;
     if(r < 0){
         cerr<<"server init failed"<<endl;
         return -1;

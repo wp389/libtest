@@ -47,7 +47,7 @@ public:
     int complate(int r)
     {
         retcode = r;    
-        cerr<<"client get rbd return value :"<< retcode <<endl;
+        //cerr<<"client get rbd return value :"<< retcode <<endl;
         if(callback)
             callback(comp,callback_arg);
         done = true;

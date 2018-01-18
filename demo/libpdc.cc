@@ -9,6 +9,17 @@
 
 PdcClient *pdc_client_mgr;
 
+
+extern "C" void rbd_version(int *major, int *minor, int *extra)
+{
+  if (major)
+    *major = LIBRBD_VER_MAJOR;
+  if (minor)
+    *minor = LIBRBD_VER_MINOR;
+  if (extra)
+    *extra = LIBRBD_VER_EXTRA;
+}
+
 extern "C" int rados_create(rados_t *prados)
 //int pdc_create_rados(pdc_rados_t *prados)
 {
@@ -23,6 +34,8 @@ extern "C" int rados_create(rados_t *prados)
             cerr<<"client init failed :"<< r <<endl;
             return -1;
         }
+    }else{
+         vmclient = pdc_client_mgr;
     }
     vmclient->inc_ref();
     *prados = vmclient;
@@ -64,7 +77,10 @@ extern "C" int rados_ioctx_create(rados_t vmclient, const char *pool_name,
     PdcClient * pclient = reinterpret_cast<PdcClient *>(vmclient);
     
     BackendClient *pceph = pclient->clusters["ceph"];
-
+    if(!pceph){
+        cerr<<"ceph rados ioctx is null ,in pid:"<<getpid()<<endl;
+        return -1;
+    }
     map<string ,BackendClient::RadosClient *>::iterator it = pceph->radoses.find(radosname);
     if(it == pceph->radoses.end()){  // not exist ,create a new one
         prados = new BackendClient::RadosClient(radosname, "/etc/ceph/ceph.conf",pceph);
@@ -137,7 +153,7 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
     if(prados->volumes.find(rbdname) != prados->volumes.end()){  //exist
         cerr<<"find pdb exist"<<endl;
         prbd = reinterpret_cast<BackendClient::RbdVolume*>(prados->volumes[rbdname]);
-        
+        *image = (void *)prbd;
     }else {    //NOT EXIST
         prbd = new BackendClient::RbdVolume(rbdname, prados);
         
@@ -210,7 +226,23 @@ extern "C" int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
     
     return 0;
 }
+extern "C" int rbd_aio_read(rbd_image_t image, uint64_t off, size_t len,
+			    char *buf, rbd_completion_t c)
+{
 
+    cerr<<"rbd aio read is not imple"<<endl;
+
+    return  -1;
+
+}
+
+extern "C" int rbd_aio_flush(rbd_image_t image, rbd_completion_t c)
+{
+
+
+
+
+}
 extern "C" void rbd_aio_release(rbd_completion_t c)
 //void pdc_aio_release(pdc_rbd_completion_t c)
 {

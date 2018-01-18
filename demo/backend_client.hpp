@@ -17,6 +17,7 @@ class BackendClient{
 public:
     void *sendmq;
     list<Msginfo *> *_queue;
+    pthread_mutex_t *_mutex;
 public:
     class RadosClient{
         string radosname;

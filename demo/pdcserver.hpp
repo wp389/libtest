@@ -95,10 +95,18 @@ public:
     int register_vm(map<string,string > &client, Msginfo *msg);
     int unregister();
     int register_connection(Msginfo* msg);
+    int release_shmkey(vector<u64> & indexlist )
+    {
+        int r;
+		
+        //r = slab.put(indexlist);
+        cerr<<"free usedlist :"<<r<<endl;
+        return r;
+    }
 
 	
 };
 
-
+extern Pdcserver*pdc_server_mgr;
 
 #endif

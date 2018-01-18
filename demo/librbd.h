@@ -19,7 +19,12 @@
 extern "C" {
 #endif
 
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+//#include "type.h"
 
+typedef unsigned long long u64;
 
 #define LIBRBD_VER_MAJOR 0
 #define LIBRBD_VER_MINOR 1
@@ -42,10 +47,10 @@ extern "C" {
 */
 #define RBD_FLAG_OBJECT_MAP_INVALID   (1<<0)
 
-typedef void *rbd_snap_t;
-typedef void *rbd_image_t;
-typedef void *rados_ioctx_t;
-typedef void *rados_t;
+typedef void* rbd_snap_t;
+typedef void* rbd_image_t;
+typedef void* rados_ioctx_t;
+typedef void* rados_t;
 
 
 typedef struct {
@@ -88,6 +93,8 @@ int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
 
 int rbd_aio_read(rbd_image_t image, u64 off, size_t len,
                               char *buf, rbd_completion_t c);
+
+int rbd_aio_flush(rbd_image_t image, rbd_completion_t c);
 
 int rbd_aio_create_completion(void *cb_arg,
                                            rbd_callback_t complete_cb,

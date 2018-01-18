@@ -57,9 +57,9 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, 
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio write");
 
-
+    pthread_mutex_lock(prbd->rados->ceph->_mutex);
     prbd->rados->ceph->_queue->push_back(msg);
-
+    pthread_mutex_unlock(prbd->rados->ceph->_mutex);
     return 0;
 }
 
@@ -81,8 +81,8 @@ void* BackendClient::findclient(map<string, string> *opclient)
     }
     return NULL;
 }
-BackendClient::BackendClient(string nm,string _conf, list<Msginfo *>*msgop):
-    name(nm),_confpath(_conf),_queue(msgop)
+BackendClient::BackendClient(string nm,string _conf, list<Msginfo *>*msgop,pthread_mutex_t *mutex):
+    name(nm),_confpath(_conf),_queue(msgop),_mutex(mutex)
 {
 
 }
