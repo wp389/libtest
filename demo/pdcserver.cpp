@@ -84,17 +84,22 @@ void* Pdcserver::Finisherthreads::_process()
 
         if(op){
         op->dump("listen thread get op");
-        if(op->opcode == ACK_MEMORY){
-            op->opcode == PDC_AIO_WRITE;
+        if(op->opcode == PDC_AIO_WRITE){
+            //op->opcode == PDC_AIO_WRITE;
             pthread_mutex_lock(&pdc->iomutex);
             pdc->ops.push_back(op);
             pthread_mutex_unlock(&pdc->iomutex);
         }
-        if(op->opcode == RW_W_FINISH){
+        else if(op->opcode == GET_MEMORY){
             pthread_mutex_lock(&pdc->msgmutex);
             pdc->msgop.push_back(op);
             pthread_mutex_unlock(&pdc->msgmutex);
-       }
+        }else{
+            pthread_mutex_lock(&pdc->msgmutex);
+            pdc->msgop.push_back(op);
+            pthread_mutex_unlock(&pdc->msgmutex);
+
+        }
         sum++;
         //op->dump("server finish tp op");
         //cerr<<" get a finish op ,do pop"<<endl;
@@ -227,7 +232,7 @@ int Pdcserver::init()
 
     pthread_mutex_init(&msgmutex,NULL);
     msgthread = new Msgthreads("MSG-threadpool",this);
-    msgthread->init(1);
+    msgthread->init(2);
 
     pthread_mutex_init(&finimutex,NULL);
     finisher = new Finisherthreads("Finisher threadpool", this);

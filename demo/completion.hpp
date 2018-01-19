@@ -14,6 +14,7 @@ typedef void * pdc_rbd_completion_t;
 typedef void (*pdc_callback_t)(pdc_rbd_completion_t c, void *arg);
 
 //(librbd::RBD::AioCompletion *)
+
 struct PdcCompletion{
     void * comp;  //(librbd::RBD::AioCompletion *)
     PdcLock lock;
@@ -29,22 +30,24 @@ struct PdcCompletion{
     bool done;
     struct timeval starttime;
 public:
-    PdcCompletion(pdc_callback_t cb, void *cb_arg, void *c):
-         comp(c),lock("PdcCompletion"),done(false)
+    PdcCompletion(pdc_callback_t cb, void *cb_arg):
+         lock("PdcCompletion"),done(false)
     {
         ::gettimeofday(&starttime ,NULL);
         callback = cb;
         callback_arg = cb_arg;
     }
-    PdcCompletion(void *c):comp(c),lock("PdcCompletion"),done(false)
+    PdcCompletion():lock("PdcCompletion"),done(false)
     {}
     ~PdcCompletion() {}
     void setcb(pdc_callback_t cb, void *cb_arg){
         callback = cb;
         callback_arg = cb_arg;
     }
-
-    int complate(int r)
+    int get_return_value(){
+        return retcode;
+    }
+    int complete(int r)
     {
         retcode = r;    
         //cerr<<"client get rbd return value :"<< retcode <<endl;
@@ -68,6 +71,41 @@ public:
         //NEED todo?
         //unlock;
         delete this;
+    }
+};
+
+
+
+struct PdcAioCompletion{
+    PdcCompletion *pc; //PdcCompletion*
+    
+public:
+    PdcAioCompletion(pdc_callback_t cb, void *cb_arg){
+        pc = new PdcCompletion(cb, cb_arg);
+        pc->comp = this;
+    }
+    void setcb(pdc_callback_t cb, void *cb_arg){
+        PdcCompletion * c = (PdcCompletion*)pc;
+        c->setcb(cb, cb_arg);
+    }
+    int complete(int r){
+        PdcCompletion * c = (PdcCompletion*)pc;
+        return c->complete(r);
+    }
+    int wait_for_complete(){
+        PdcCompletion * c = (PdcCompletion*)pc;
+        return c->wait_for_complete();
+    }
+    int aio_get_return_value(){
+        PdcCompletion * c = (PdcCompletion*)pc;
+        return c->get_return_value();
+    }
+
+    void release(){
+        PdcCompletion * c = (PdcCompletion*)pc;
+        c->release();
+        //delete this;
+		
     }
 };
 

@@ -295,18 +295,26 @@ public:
             cerr<<"shm count max is:"<<sb->AllCount<<" now use:"<<index<<endl;;
         }
 
-        return (T *)(m_pShm + sizeof(SuperBlock) + index * sizeof(T));
+        return (T *)(m_pShm + 1024 + index * sizeof(T));
     }
     int put(vector<u64> &used){
         //semLockGuard oLock(m_Sem);
+        vector<u64>::iterator it =used.begin();
+        int size = 0;
+        if(it == used.end())  return -2;
+
         lock.lock();
-        freelist.assign(used.begin(), used.end());
+        for(;it<used.end();it++){
+            freelist.push_back(*it);
+            size++;
+        }
+        //freelist.assign(used.begin(), used.end());
         //freelist.splice(freelist.end(), used, used.begin(), used.end()); //for list
-        sb->Avalid  += used.size();
-        sb->Inuse -= used.size();
+        sb->Avalid  += size;
+        sb->Inuse -= size;
         lock.unlock();
         assert(sb->Inuse + sb->Avalid == sb->AllCount);
-        return used.size();
+        return size;
     }
 
 

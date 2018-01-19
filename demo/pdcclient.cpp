@@ -38,7 +38,7 @@ void* PdcClient::Iothreads::_process()
 
         msg->dump("iothread: client io tp op");
         if(msg->opcode == PDC_AIO_WRITE){
-            cerr<<"push op aio write:"<<msg->opid<<endl;
+            //cerr<<"push op aio write:"<<msg->opid<<endl;
             prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume());
             if(!prbd){
             cerr<<"get NULL volume"<<endl;
@@ -125,7 +125,7 @@ void* PdcClient::Finisherthreads::_process()
                 PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);
                 if(c && c->callback){
                     ///c->callback(c->comp, c->callback_arg);
-                    c->complate(msg->return_code);
+                    c->complete(msg->return_code);
                     //todo put shmmemory keys .  
                     vector<u64> index(op->data.indexlist,op->data.indexlist+sizeof(op->data.indexlist)/sizeof(u64));
                     pdc->release_shmkey(index);
@@ -222,7 +222,7 @@ void* PdcClient::Msgthreads::_process()
                 list<u64> listadd ;
                 //TODO:SET START TIME
                 msg->getopid();
-                cerr<<"start to get memory"<<endl;
+                //cerr<<"start to get memory"<<endl;
                 p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
                 assert(p_pipe);
                 r = p_pipe->push(msg);
@@ -257,7 +257,7 @@ void* PdcClient::Msgthreads::_process()
                 PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);
                 if(c && c->callback){
                     ///c->callback(c->comp, c->callback_arg);
-                    c->complate(msg->return_code);
+                    c->complete(msg->return_code);
                     
                 }
                 delete msg;

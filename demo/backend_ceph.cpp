@@ -100,7 +100,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
     //Pdcserver * pdc = pdc_server_mgr;
     Msginfo *op = (Msginfo*)arg;
     op->dump("pdc_callback");
-    cerr<<"server get rbd callback"<<endl;
+    //cerr<<"server get rbd callback"<<endl;
     op->ref_dec();
     op->return_code |= rbd_aio_get_return_value(cb);
     if(op->isdone()){

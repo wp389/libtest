@@ -47,7 +47,8 @@ public:
         ~RbdVolume() {}  //todo close pipe
         int init(int create);
         const char * GetName() {return rbdname.c_str();}
-        int aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t cb);
+        
+        int aio_write(u64 offset, size_t len,const char *buf, PdcCompletion* c);
         //static void pdc_callback(rbd_completion_t cb, void *arg);
         //int do_create_rbd_completion(void * op, rbd_completion_t *comp );
         //int do_aio_write(void *_op,u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c);
@@ -64,6 +65,5 @@ public:
 
     void *findclient(map<string, string> *opclient);
 };
-
 
 #endif

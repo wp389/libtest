@@ -35,10 +35,11 @@ int BackendClient::RbdVolume::init(int create = 0)
     }
     return 0;
 }
-int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c)
+
+int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, PdcCompletion *c)
 {
     BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)this;
-    PdcCompletion *comp = (PdcCompletion*)c;
+    //PdcCompletion *comp = (PdcCompletion*)c;
 	
     //PdcClient *pdc = pdc_client_mgr;
     
@@ -52,7 +53,7 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, 
     msg->originbuf = buf;
     msg->data.offset = offset;
     msg->data.len = len;
-    msg->data.c = c;
+    msg->data.c = (void *)c;
     //op->volume = (void *)prbd;
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio write");

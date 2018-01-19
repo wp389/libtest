@@ -13,7 +13,7 @@ rm /lib64/librados.so -f
 cp -f obj/libpdc.so.1.0.0 /lib64/
 echo "to change librbd.so"
 ln -s /lib64/libpdc.so.1.0.0 /lib64/librbd.so
-ln -s /lib64/libpdc.so.1.0,0 /lib64/librados.so
+ln -s /lib64/libpdc.so.1.0.0 /lib64/librados.so
 
 gcc test/test.c -o obj/vmtest -lrbd -lrados
 #g++ test.c -o pdctest -Wl,-rpath=/home/w/code/test/demo/obj/ -L/home/w/code/test/demo/obj/ -lrbd
