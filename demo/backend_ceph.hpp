@@ -4,13 +4,10 @@
 
 #include "type.h"
 
-#ifdef LOCALTEST
-#include "rbd/librbd.h"
-#include "rados/librados.h"
-#else
-#include <rbd/librbd.h>
-#include <rados/librados.h>
-#endif
+
+#include <rbd-bak/librbd.h>
+#include <rados-bak/librados.h>
+
 #include "completion.hpp"
 #include "pdc_lock.hpp"
 

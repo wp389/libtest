@@ -226,7 +226,7 @@ extern "C" int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
     
     return 0;
 }
-extern "C" int rbd_aio_read(rbd_image_t image, uint64_t off, size_t len,
+extern "C" int rbd_aio_read(rbd_image_t image, u64 off, size_t len,
 			    char *buf, rbd_completion_t c)
 {
 

@@ -8,6 +8,8 @@
 #include <sys/shm.h>
 #include <string.h>
 #include <stdint.h>
+
+#include "pdc_lock.hpp"
 #define SHMQUEUEOK 1
 #define SHMQUEUEERROR -1
 #define SHMKEY   2333
@@ -135,7 +137,7 @@ template<typename T>
 class ShmMem {
 public:
     explicit ShmMem(int key,int iCreate=-1):m_pShm(NULL),m_iStatus(-1), m_iShmId(-1), 
-        m_key(key),m_iCreate(iCreate),usetype(0){
+        m_key(key),m_iCreate(iCreate),usetype(0),lock("shmlock"){
         m_pShm = NULL;
     }
 
@@ -183,8 +185,6 @@ public:
                 sb->Rear = 0;
                 sb->Avalid = sb->AllCount;
                 sb->Inuse = 0;
-                freelist.resize(sb->AllCount);
-                usedlist.resize(sb->AllCount);
                 //::memcpy(m_pShm,&Head,sizeof(QueueHead));
             }else if(usetype ==1){
             
@@ -230,7 +230,8 @@ public:
     *   but ,when use in multithreads ,a lock is needed.
     */
     int  get(u32 size, u64* sum){  //Get memory block, 
-        semLockGuard oLock(m_Sem);
+        //semLockGuard oLock(m_Sem);
+        lock.lock();
         //list<u64> sum;
         int n =0;
         if (isFull() ) {
@@ -273,8 +274,8 @@ public:
             }
             
     	}
-	cerr<<""
-       assert(sb->Inuse + sb->Avalid == sb->AllCount);
+	lock.unlock();
+       assert((sb->Inuse + sb->Avalid) == sb->AllCount);
         return n;
         
     }
@@ -287,11 +288,13 @@ public:
         return (T *)(m_pShm + sizeof(SuperBlock) + index * sizeof(T));
     }
     int put(vector<u64> &used){
-        semLockGuard oLock(m_Sem);
+        //semLockGuard oLock(m_Sem);
+        lock.lock();
         freelist.assign(used.begin(), used.end());
         //freelist.splice(freelist.end(), used, used.begin(), used.end()); //for list
         sb->Avalid  += used.size();
         sb->Inuse -= used.size();
+        lock.unlock();
         assert(sb->Inuse + sb->Avalid == sb->AllCount);
         return used.size();
     }
@@ -313,6 +316,7 @@ public:
     char *pdata;
     T *pmem;
     SemLock m_Sem;
+    PdcLock lock;
     std::string m_sErrMsg;
 };
 

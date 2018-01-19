@@ -59,7 +59,7 @@ public:
 
 
 public:
-    BackendClient(string nm, string confpath, list<Msginfo *>* msgop);
+    BackendClient(string nm, string confpath, list<Msginfo *>* msgop, pthread_mutex_t *mutex);
     ~BackendClient() {}
 
     void *findclient(map<string, string> *opclient);

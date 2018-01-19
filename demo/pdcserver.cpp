@@ -1,5 +1,5 @@
-#include "rbd/librbd.h"
-#include "rados/librados.h"
+#include "rbd-bak/librbd.h"
+#include "rados-bak/librados.h"
 
 
 //#include "type.h"
@@ -36,7 +36,7 @@ void* Pdcserver::Iothreads::_process()
         pthread_mutex_unlock(&pdc->iomutex);
 
         op->dump("server io tp op");
-        OpFindClient(op);
+        pdc->OpFindClient(op);
         vol = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
         if(!vol){
             op->dump("get NULL volume");
