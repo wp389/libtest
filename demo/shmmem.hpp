@@ -185,6 +185,9 @@ public:
                 sb->Rear = 0;
                 sb->Avalid = sb->AllCount;
                 sb->Inuse = 0;
+                freelist.resize(sb->AllCount);
+                usedlist.resize(sb->AllCount);
+                //freelist()
                 //::memcpy(m_pShm,&Head,sizeof(QueueHead));
             }else if(usetype ==1){
             
@@ -247,6 +250,7 @@ public:
         u32 count = 0;
         count = size /sb->ItemSize;
         count = ((count * sb->ItemSize ) >=  size)? count :count +1;
+        
         while(count > 0){
             //u64 tmp 
             if(sb->Front < sb->AllCount){
@@ -262,12 +266,18 @@ public:
                 
             }else{
                 
-                assert(freelist.size() >= count);
+                assert(freelist.capacity() >= count);
+                if(sb->Avalid == 0){
+                    lock.unlock();
+		       return -1;
+                }
                 count--;
-                sum[n++] = freelist.front();
+                
+                sum[n++] = freelist.back();
                 //sum.push_back(freelist.front());
                 //freelist.pop_front();   //for list
-                freelist.erase(freelist.begin());  //for vetor
+                freelist.pop_back();		//for vertor
+                //freelist.erase(freelist.begin());  //for vetor
                 sb->Inuse++;
                 sb->Avalid--;
 

@@ -154,7 +154,7 @@ void* Pdcserver::Msgthreads::_process()
                 //vector<u64> listadd ;
                 pdc->OpFindClient(msg);
                 r = pdc->slab.get(msg->data.len, msg->data.indexlist);
-                if(r < 0){
+                if(r <= 0){
                     cerr<<"get memory failed"<<endl;
                     continue;
                 }
