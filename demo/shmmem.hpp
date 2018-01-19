@@ -284,9 +284,10 @@ public:
             }
             
     	}
+       assert(sb->Inuse + sb->Avalid == sb->AllCount);
 	lock.unlock();
-       assert((sb->Inuse + sb->Avalid) == sb->AllCount);
-        return n;
+       //assert((sb->Inuse + sb->Avalid) == sb->AllCount);
+       return n;
         
     }
 
@@ -312,8 +313,9 @@ public:
         //freelist.splice(freelist.end(), used, used.begin(), used.end()); //for list
         sb->Avalid  += size;
         sb->Inuse -= size;
-        lock.unlock();
         assert(sb->Inuse + sb->Avalid == sb->AllCount);
+        lock.unlock();
+        
         return size;
     }
 

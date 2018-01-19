@@ -214,7 +214,7 @@ extern "C" int rbd_aio_create_completion(void *cb_arg,
 }
 
 PdcCompletion* get_aio_completion(PdcAioCompletion* comp) {
-  return reinterpret_cast<PdcCompletion*>(comp->pc);
+  return comp->pc;
 }
 
 extern "C" int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
