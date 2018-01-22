@@ -1,5 +1,5 @@
-#include "rbd-bak/librbd.h"
-#include "rados-bak/librados.h"
+//#include "rbd-bak/librbd.h"
+//#include "rados-bak/librados.h"
 
 
 //#include "type.h"

@@ -177,6 +177,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
             //vols[it->second] = rbd;
             vols.insert(pair<string ,RbdVolume*>(it->second ,rbd));
             p_rados->volumes[it->second] = (void *)rbd;
+            
         }
     }else{
         CephBackend::RadosClient *rados = new CephBackend::RadosClient(it->first, "/etc/ceph/ceph.conf",this);

@@ -5,8 +5,8 @@
 #include "type.h"
 
 
-#include <rbd-bak/librbd.h>
-#include <rados-bak/librados.h>
+#include <rbd/librbd.h>
+#include <rados/librados.h>
 
 #include "completion.hpp"
 #include "pdc_lock.hpp"

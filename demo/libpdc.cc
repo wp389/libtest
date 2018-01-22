@@ -189,7 +189,7 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
     }
     
     }
-
+    sleep(1);
     cerr<<"pdc create rbd over"<<endl;
     return 0;
 
