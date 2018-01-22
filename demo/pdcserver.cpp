@@ -21,7 +21,7 @@ void Pdcserver::register_put(Msginfo *op)
     return op;
 }
 
-void* Pdcserver::Iothreads::_process()
+Msginfo* Pdcserver::Iothreads::_process()
 {
     int r = 0;
     u64 sum =0;
@@ -50,6 +50,7 @@ void* Pdcserver::Iothreads::_process()
             continue;
         }
         sum++;
+        if(0){    //black hole
         rbd_completion_t comp;
         u64 off = op->data.offset;
         u32 bufsize = op->data.len;
@@ -64,6 +65,10 @@ void* Pdcserver::Iothreads::_process()
             vol->do_aio_write(op, off+ i*sizeof(simpledata), lengh, (char *)pdata, comp);   
         }
         //cerr<<"do rbd write---------:"<<sum<<endl;
+        }else{
+            pdc_callback(NULL, op);
+
+        }
     }
 
     return 0;

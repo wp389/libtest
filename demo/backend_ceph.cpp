@@ -104,7 +104,10 @@ void pdc_callback(rbd_completion_t cb, void *arg)
     op->dump("pdc_callback");
     //cerr<<"server get rbd callback"<<endl;
     op->ref_dec();
-    op->return_code |= rbd_aio_get_return_value(cb);
+    if(cb)
+        op->return_code |= rbd_aio_get_return_value(cb);
+    else
+        op->return_code = 0;
     if(op->isdone()){
         CephBackend::RbdVolume *prbd = (CephBackend::RbdVolume *)op->volume;
         
@@ -127,7 +130,8 @@ void pdc_callback(rbd_completion_t cb, void *arg)
         pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
         r = p_pipe->push(op);
     }
-    rbd_aio_release(cb);
+    if(cb)
+        rbd_aio_release(cb);
     
     //cerr<<"pdc_callback , now ref is:"<<op->ref << "  return_code ="<<op->return_code <<" put mem:"<<n<<endl;;
     
