@@ -305,7 +305,7 @@ public:
         if(it == used.end())  return -2;
 
         lock.lock();
-        for(;it<used.end();it++){
+        for(;it != used.end();it++){
             freelist.push_back(*it);
             size++;
         }

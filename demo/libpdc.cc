@@ -272,7 +272,7 @@ extern "C" void demo_completion(pdc_rbd_completion_t c,void *arg)
 extern "C" int rbd_stat(rbd_image_t image, rbd_image_info_t *info,
 	                                size_t infosize)
 {
-    info->size = 1024*1024*1024;
+    info->size = 10737418240;//1024*1024*1024*10;
     info->obj_size = 1024*1024*4;
     info->num_objs = 256;
     info->order = 22;
