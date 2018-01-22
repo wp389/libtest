@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
-//#include <malloc.h>
+#include <malloc.h>
 #include <stdlib.h>
 #include <memory.h>
 
@@ -49,6 +49,8 @@ extern u64 opid;
 #define NAMELENTH 64
 #define SERVERCREATE 1
 #define CLIENTNOCREATE 0
+
+#define SERVER_IO_BLACKHOLE 0
 using namespace std;
 //using namespace wp::Pipe;
 //using namespace pdcPipe::PdcPipe;

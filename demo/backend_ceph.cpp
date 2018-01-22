@@ -93,50 +93,6 @@ int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pd
 
 
 
-
-void pdc_callback(rbd_completion_t cb, void *arg)
-{
-    int r;
-    int n;
-    //Pdcserver * pdc = pdc_server_mgr;
-    Msginfo *op = (Msginfo*)arg;
-    shmMem::ShmMem<simpledata> *shm = reinterpret_cast<shmMem::ShmMem<simpledata> *>(op->slab);
-    op->dump("pdc_callback");
-    //cerr<<"server get rbd callback"<<endl;
-    op->ref_dec();
-    if(cb)
-        op->return_code |= rbd_aio_get_return_value(cb);
-    else
-        op->return_code = 0;
-    if(op->isdone()){
-        CephBackend::RbdVolume *prbd = (CephBackend::RbdVolume *)op->volume;
-        
-        if(! prbd) assert(0);
-        if(op->opcode == PDC_AIO_WRITE) {
-            op->opcode =  RW_W_FINISH;
-            //todo put shmmemory keys .  
-            
-            if(shm){
-                vector<u64> index(op->data.indexlist,op->data.indexlist+sizeof(op->data.indexlist)/sizeof(u64));
-                n = shm->put(index);
-                if(r < 0 ){
-                    cerr<<"shm->put falied:"<<r<<endl;
-                    //return ;
-                    
-                }
-            }
-            
-        }
-        pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
-        r = p_pipe->push(op);
-    }
-    if(cb)
-        rbd_aio_release(cb);
-    
-    //cerr<<"pdc_callback , now ref is:"<<op->ref << "  return_code ="<<op->return_code <<" put mem:"<<n<<endl;;
-    
-}
-
 int CephBackend::RbdVolume::do_create_rbd_completion(void * op, rbd_completion_t *comp )
 {
     int r;

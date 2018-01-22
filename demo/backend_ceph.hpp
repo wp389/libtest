@@ -74,6 +74,7 @@ public:
 };
 
 
+extern void pdc_callback(rbd_completion_t cb, void *arg);
 
 
 //int release_shmkey(vector<u64> & indexlist );

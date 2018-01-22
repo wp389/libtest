@@ -104,6 +104,8 @@ public:
         return r;
     }
     Msginfo* register_put(Msginfo *op);
+
+    friend void pdc_callback(rbd_completion_t cb, void *arg);
 	
 };
 
