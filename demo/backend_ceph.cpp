@@ -100,7 +100,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
     int n;
     //Pdcserver * pdc = pdc_server_mgr;
     Msginfo *op = (Msginfo*)arg;
-    shmMem::ShmMem<simpledata> *shm = reinterpret_cast<shmMem::ShmMem *>(op->slab);
+    shmMem::ShmMem<simpledata> *shm = reinterpret_cast<shmMem::ShmMem<simpledata> *>(op->slab);
     op->dump("pdc_callback");
     //cerr<<"server get rbd callback"<<endl;
     op->ref_dec();
