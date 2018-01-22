@@ -241,17 +241,7 @@ void* PdcClient::Msgthreads::_process()
             }else if(msg->opcode == ACK_MEMORY){
             //send msg and wait for ack:
                 assert(0);
-                /*
-                Msginfo *op = new Msginfo();
-                op->copy(msg);
-                op->opcode = PDC_AIO_WRITE;
-                op->dump("get memory ack, todo RW");
-                //assert(msg->opcode == ACK_MEMORY);
-                pthread_mutex_lock(&pdc->iomutex);
-                pdc->ops.push_back(op);
-                pthread_mutex_unlock(&pdc->iomutex);
-                cerr<<"op "<<op->opid<<" to ops queue"<<endl;
-                */
+ 
             }else if(msg->opcode == RW_W_FINISH){
                 //cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
                 PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);

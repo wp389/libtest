@@ -4,7 +4,7 @@
 #include "type.h"
 #include "backend_ceph.hpp"
 #include "pipe.hpp"
-
+#include "shmmem.hpp"
 CephBackend::RadosClient::RadosClient(string nm, string _conf, CephBackend *_ceph):
     radosname(nm),confpath(_conf),ceph(_ceph),cluster(NULL)
 {
@@ -97,8 +97,10 @@ int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pd
 void pdc_callback(rbd_completion_t cb, void *arg)
 {
     int r;
+    int n;
     //Pdcserver * pdc = pdc_server_mgr;
     Msginfo *op = (Msginfo*)arg;
+    shmMem::ShmMem<simpledata> *shm = reinterpret_cast<shmMem::ShmMem *>(op->slab);
     op->dump("pdc_callback");
     //cerr<<"server get rbd callback"<<endl;
     op->ref_dec();
@@ -110,18 +112,24 @@ void pdc_callback(rbd_completion_t cb, void *arg)
         if(op->opcode == PDC_AIO_WRITE) {
             op->opcode =  RW_W_FINISH;
             //todo put shmmemory keys .  
-            /*
-            if(pdc){
+            
+            if(shm){
                 vector<u64> index(op->data.indexlist,op->data.indexlist+sizeof(op->data.indexlist)/sizeof(u64));
-                pdc->release_shmkey(index);
+                n = shm->put(index);
+                if(r < 0 ){
+                    cerr<<"shm->put falied:"<<r<<endl;
+                    //return ;
+                    
+                }
             }
-            */
+            
         }
         pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
         r = p_pipe->push(op);
     }
     rbd_aio_release(cb);
-    cerr<<"pdc_callback , now ref is:"<<op->ref << "  return_code ="<<op->return_code<<endl;;
+    
+    //cerr<<"pdc_callback , now ref is:"<<op->ref << "  return_code ="<<op->return_code <<" put mem:"<<n<<endl;;
     
 }
 

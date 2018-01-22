@@ -28,7 +28,7 @@ void rbd_aio_cb(rbd_completion_t c, void*arg)
         printf("rbd_aio_cb ,return failed ,r= %u \n",r);
      
     }
-    rbd_aio_release(c);
+    ///rbd_aio_release(c);
 
 }
 
@@ -71,9 +71,10 @@ int main()
         n++;
         r = rbd_aio_create_completion(test, (rbd_callback_t)rbd_aio_cb, &c[retry]);
         r = rbd_aio_write(img, n*2048, len, buf, c[retry]);
-
-	rbd_aio_wait_for_complete( c[retry]);
+	 
+       retry--;
     }
+    rbd_aio_wait_for_complete( c[++retry]);
     gettimeofday(&end , NULL);
     printf("test io count: %u \n",n);
     printf("start at:%u s, %u us \n",start.tv_sec, start.tv_usec);

@@ -14,6 +14,12 @@ int Pdcserver::Iothreads::do_op(void * data)
         memset(data , 3, 4096);
     return 0;
 }
+void Pdcserver::register_put(Msginfo *op)
+{
+    //Putop *p_op = new Putop(op, &slab);
+    op->slab = &slab;
+    return op;
+}
 
 void* Pdcserver::Iothreads::_process()
 {
@@ -48,7 +54,8 @@ void* Pdcserver::Iothreads::_process()
         u64 off = op->data.offset;
         u32 bufsize = op->data.len;
         u32 lengh;
-        vol->do_create_rbd_completion(op, &comp);
+        
+        vol->do_create_rbd_completion(pdc->register_put(op), &comp);
         for(int i = 0;i < op->data.chunksize;i++){
             //memset(op->data.pdata, 6, op->data.len);
             simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
@@ -145,17 +152,26 @@ void* Pdcserver::Msgthreads::_process()
             //assert(msg->client.cluster == "ceph");
             client[msg->client.pool] = msg->client.volume;
             //perf.inc();
-            if(msg->opcode == OPEN_RADOS){
+            switch(msg->opcode){
+            //if(msg->opcode == OPEN_RADOS){
+            case OPEN_RADOS:
+            {
                 pdc->register_connection(msg);
-
-            }else if(msg->opcode == OPEN_RBD){
+                break;
+            }
+            //}else if(msg->opcode == OPEN_RBD){
+            case OPEN_RBD:
+            {
                 r = pdc->register_vm(client, msg);
                 if(r < 0){
                     cerr<<"register vm failed ret = "<<r <<endl;
                     continue;
                 }
-                
-            }else if(msg->opcode == GET_MEMORY){
+                break;
+            }
+            //}else if(msg->opcode == GET_MEMORY){
+            case GET_MEMORY:
+            {
                 //vector<u64> listadd ;
                 pdc->OpFindClient(msg);
                 r = pdc->slab.get(msg->data.len, msg->data.indexlist);
@@ -177,7 +193,11 @@ void* Pdcserver::Msgthreads::_process()
                     cerr<<"pipe push msg:"<<msg->opid<<" failed"<<endl;
                     continue;
                 }
-            }else if(msg->opcode == PDC_AIO_WRITE){
+                break;
+            }
+            //}else if(msg->opcode == PDC_AIO_WRITE){
+            default:
+            {
                 /*
 
                 pdc->OpFindClient(msg);
@@ -185,16 +205,14 @@ void* Pdcserver::Msgthreads::_process()
                 server->ops.push_back(msg);
                 pthread_mutex_unlock(&pdc->iomutex);
                 */
+                cerr<<"opcode error:"<<msg->opcode<<endl;
                 assert(0);
+                break;
             }
 
+         }
+        }
 
-        }
-        if(r < 0){
-            cerr<<"msg do_op failed :"<<r <<endl;
-            assert(0);
-        }
-        
     }
 
 return 0;

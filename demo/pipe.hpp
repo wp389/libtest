@@ -138,18 +138,18 @@ public:
             m_key(""),m_model(0),semkey(-1),s_type(systype),
         fd(-1){
             if(systype == PIPECLIENT)
-            m_model = O_WRONLY|O_NONBLOCK;  //|O_NONBLOCK
+            m_model = O_WRONLY;  //|O_NONBLOCK
             if(systype == PIPESERVER)
-            m_model = O_RDONLY|O_NONBLOCK;
+            m_model = O_RDONLY;
             //m_key
         }		
         explicit PdcPipe(const char *  key, int semk,int type, SYS_t systype):
             m_key(key),m_model(0),m_type(type),semkey(semk),s_type(systype),
         fd(-1){
             if(systype == PIPECLIENT)
-            m_model = O_WRONLY|O_NONBLOCK;  //|O_NONBLOCK
+            m_model = O_WRONLY;  //|O_NONBLOCK
             if(systype == PIPESERVER)
-            m_model = O_RDONLY|O_NONBLOCK;
+            m_model = O_RDONLY;
             //m_key
         }
 
@@ -173,7 +173,7 @@ public:
 					}
 				}
 				//if(s_type == PIPESERVER){
-                           if(1){
+                           if(0){
                                  fd = ::open(m_key.c_str(), m_model);
 					if(fd < 0 ){
 					    cerr<<"open :"<<m_key<<"failed "<<endl; 

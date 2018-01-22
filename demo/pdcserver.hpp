@@ -103,7 +103,7 @@ public:
         cerr<<"free usedlist :"<<r<<endl;
         return r;
     }
-
+    Msginfo* register_put(Msginfo *op);
 	
 };
 

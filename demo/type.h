@@ -3,6 +3,7 @@
 *
 */
 #pragma once
+
 #include <stdio.h>
 #include <string>
 #include <map>
@@ -257,8 +258,9 @@ struct  Msginfo{
     void * op;			//
     void * volume;		//rbd volume info in client or server
     int return_code;
+    void *slab;
 	
-    Msginfo():sw(true),opid(0),remote_pid(0),return_code(0),ref(0) {pid = getpid(); };
+    Msginfo():sw(false),opid(0),remote_pid(0),return_code(0),ref(0) {pid = getpid(); };
     void getopid() {opid = ++msgid;}
     void ref_inc() {ref++;}
     void ref_dec() {ref--;}
