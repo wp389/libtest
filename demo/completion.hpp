@@ -49,6 +49,7 @@ public:
     }
     int complete(int r)
     {
+        ///static unsigned long long  sum = 0;
         retcode = r;    
         //cerr<<"client get rbd return value :"<< retcode <<endl;
         if(callback)
@@ -70,7 +71,7 @@ public:
         //lock;
         //NEED todo?
         //unlock;
-        delete this;
+        //delete this;
     }
 };
 
@@ -104,7 +105,7 @@ public:
     void release(){
         PdcCompletion * c = (PdcCompletion*)pc;
         c->release();
-        //delete this;
+        delete this;
 		
     }
 };

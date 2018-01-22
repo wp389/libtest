@@ -177,6 +177,7 @@ void* PdcClient::Msgthreads::_process()
         msg = m;
         pdc->msgmq.clear();
 */
+
         pthread_mutex_lock(&pdc->msgmutex);
         if(pdc->msgop.empty()){
             pthread_mutex_unlock(&pdc->msgmutex);
@@ -256,10 +257,7 @@ void* PdcClient::Msgthreads::_process()
         p_pipe->clear();
         }
 		
-        if(r < 0){
-            cerr<<"msg do_op failed :"<<r <<endl;
-            assert(0);
-        }
+  
         
     }
 

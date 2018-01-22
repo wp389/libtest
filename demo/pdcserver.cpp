@@ -70,6 +70,7 @@ Msginfo* Pdcserver::Iothreads::_process()
 {
     int r = 0;
     u64 sum =0;
+    static bool flag = false;
     Pdcserver *pdc = (Pdcserver *)server;
     CephBackend::RbdVolume *vol;
     cerr<<"IOthread "<<pthread_self()<<" start"<<endl;
@@ -100,7 +101,8 @@ Msginfo* Pdcserver::Iothreads::_process()
         u64 off = op->data.offset;
         u32 bufsize = op->data.len;
         u32 lengh;
-        
+
+        flag = false;
         vol->do_create_rbd_completion(op, &comp);
         for(int i = 0;i < op->data.chunksize;i++){
             //memset(op->data.pdata, 6, op->data.len);
@@ -111,6 +113,10 @@ Msginfo* Pdcserver::Iothreads::_process()
         }
         //cerr<<"do rbd write---------:"<<sum<<endl;
         }else{
+            if(!flag){
+                flag = true;
+                cerr<<"********server start to use black hole*******"<<DKLL
+            }
             op->ref_inc();
             pdc_callback(NULL, op);
 

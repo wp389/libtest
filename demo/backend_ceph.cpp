@@ -59,6 +59,7 @@ int CephBackend::RbdVolume::init(int create = 0)
     }
     return 0;
 }
+/*
 int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c)
 {
     CephBackend::RbdVolume*prbd = (CephBackend::RbdVolume*)this;
@@ -83,14 +84,10 @@ int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pd
 
 
     prbd->rados->ceph->_queue->push_back(msg);
-    /*
-    pthread_mutex_lock(&pdc->iomutex);
-    pdc->msgop.push_back(msg);
-    pthread_mutex_unlock(&pdc->iomutex);
-    */
+
     return 0;
 }
-
+*/
 
 
 int CephBackend::RbdVolume::do_create_rbd_completion(void * op, rbd_completion_t *comp )
