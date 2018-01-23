@@ -59,14 +59,14 @@ int Pdcserver::Iothreads::do_op(void * data)
         memset(data , 3, 4096);
     return 0;
 }
-void Pdcserver::register_put(Msginfo *op)
+Msginfo* Pdcserver::register_put(Msginfo *op)
 {
     //Putop *p_op = new Putop(op, &slab);
     op->slab = &slab;
     return op;
 }
 
-Msginfo* Pdcserver::Iothreads::_process()
+void* Pdcserver::Iothreads::_process()
 {
     int r = 0;
     u64 sum =0;
@@ -115,7 +115,7 @@ Msginfo* Pdcserver::Iothreads::_process()
         }else{
             if(!flag){
                 flag = true;
-                cerr<<"********server start to use black hole*******"<<DKLL
+                cerr<<"********server start to use black hole*******"<<endl;
             }
             op->ref_inc();
             pdc_callback(NULL, op);

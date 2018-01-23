@@ -238,7 +238,9 @@ public:
         //list<u64> sum;
         int n =0;
         if (isFull() ) {
-            cerr<<"shm had no memory, can not get one"<<endl;
+            cerr<<"shm is full, all:"<<sb->AllCount<<" inuse:"<<sb->Inuse<<
+				" freelist:"<<freelist.size()<<endl;
+            //cerr<<"shm had no memory, can not get one"<<endl;
             assert(0);
             return  -1;
         }
