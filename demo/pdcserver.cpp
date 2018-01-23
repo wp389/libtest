@@ -45,7 +45,13 @@ void pdc_callback(rbd_completion_t cb, void *arg)
         }
         pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
         r = p_pipe->push(op);
+        if(r < 0){
+            cerr<<"callback to push pipe error:"<<r<<endl;
+        }
+        //TO DELETE OP
+        
     }
+    delete op;
     if(cb)
         rbd_aio_release(cb);
     
@@ -180,11 +186,14 @@ void* Pdcserver::Msgthreads::_process()
     int r;
     u64 sum = 0;
     CephBackend::RbdVolume *vol;
+
     Pdcserver *pdc = (Pdcserver *)server;
     cerr<<"MSGthread "<<pthread_self()<<" start"<<endl;
 
     while(1){
         if(stop() ) continue;
+        //while(!pdc->msgop.empty()){
+        if(1){
         pthread_mutex_lock(&pdc->msgmutex);
         if(pdc->msgop.empty()){
             pthread_mutex_unlock(&pdc->msgmutex);
@@ -193,14 +202,8 @@ void* Pdcserver::Msgthreads::_process()
         Msginfo *msg = pdc->msgop.front();
         pdc->msgop.pop_front();
         pthread_mutex_unlock(&pdc->msgmutex);
+        if(!msg) continue;
 
-/*
-        Msginfo *msg = pdc->msgmq.pop();
-        if(!msg){
-            
-            continue;
-        }
-*/
         if(msg){
             sum++;
             assert(msg);
@@ -240,8 +243,7 @@ void* Pdcserver::Msgthreads::_process()
                 msg->opcode = ACK_MEMORY;
                 //msg->data.indexlist.swap(listadd);
                 pdcPipe::PdcPipe<Msginfo>::ptr pipe;
-
-                CephBackend::RbdVolume *vol = reinterpret_cast<CephBackend::RbdVolume *>(msg->volume);
+                vol = reinterpret_cast<CephBackend::RbdVolume *>(msg->volume);
                 pipe =reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(vol->mq[SENDMQ]);
                 //pipe = server->ackmq[client];
                 r = pipe->push(msg);
@@ -269,7 +271,9 @@ void* Pdcserver::Msgthreads::_process()
 
          }
         }
-
+        delete msg;
+       }
+       
     }
 
 return 0;

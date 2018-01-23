@@ -6,7 +6,8 @@ g++ -shared -fPIC libpdc.cc pdcclient.cpp backend_client.cpp pipe.cpp type.cc pd
 
 
 ls obj/
-cp -f obj/libpdc.so.1.0.0 /pdc/lib64/
+rm /pdc/lib64/libpdc.so.1.0.0 -f
+cp  obj/libpdc.so.1.0.0 /pdc/lib64/
 
 rm /pdc/lib64/librbd.so -f
 rm /pdc/lib64/librados.so -f

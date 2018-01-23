@@ -166,6 +166,7 @@ void* PdcClient::Msgthreads::_process()
     pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
     BackendClient::RbdVolume *prbd;
     PdcClient *pdc = (PdcClient *)pc;
+    PdcCompletion *c;
     cerr<<"IOthread "<<pthread_self()<<" start"<<endl;
     
     while(1){
@@ -203,24 +204,18 @@ void* PdcClient::Msgthreads::_process()
             client[msg->client.pool] = msg->client.volume;
             //perf.inc();
             prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->volume); 
-            //if(msg->opcode == OPEN_RBD){
-            if(1){
-            //r = pdc->register_vm(client, msg);
-            if(r < 0){
-                cerr<<"register vm failed ret = "<<r <<endl;
-                continue;
-            }
-            if(msg->opcode == OPEN_RADOS){
-                cerr<<"do not come here "<<msg->opid<<endl;
-                continue;
-            }else if(msg->opcode == OPEN_RBD){
-                 cerr<<"do not come here "<<msg->opid<<endl;
-                 continue;
-            }
-            else if(msg->opcode == PDC_AIO_WRITE){
+
+            switch(msg->opcode){
+            case OPEN_RADOS:
+                cerr<<"do not come here rados"<<msg->opid<<endl;
+                break;
+            case OPEN_RBD:
+                 cerr<<"do not come here rbd"<<msg->opid<<endl;
+                 break;
+            case PDC_AIO_WRITE:
             assert(prbd);
                 msg->opcode =GET_MEMORY;
-                list<u64> listadd ;
+                //list<u64> listadd ;
                 //TODO:SET START TIME
                 msg->getopid();
                 //cerr<<"start to get memory"<<endl;
@@ -230,33 +225,35 @@ void* PdcClient::Msgthreads::_process()
                 if(r< 0){
                     cerr<<"=============get memory failed"<<endl;
                     msg->dump(" msg push failed" );
-                    delete msg;
-                    continue;
-
+                    //delete msg;
+                    //break;
                 }
-                
-                delete msg;
+                break;
+                //delete msg;
                 //TODO:SET END TIME
-            }else if(msg->opcode == PDC_AIO_READ){
+            case PDC_AIO_READ:
 
-            }else if(msg->opcode == ACK_MEMORY){
+                break;
+            case ACK_MEMORY:
             //send msg and wait for ack:
                 assert(0);
- 
-            }else if(msg->opcode == RW_W_FINISH){
+                break;
+            case RW_W_FINISH:
                 //cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
-                PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);
+                c = reinterpret_cast<PdcCompletion*>(msg->data.c);
                 if(c && c->callback){
                     ///c->callback(c->comp, c->callback_arg);
                     c->complete(msg->return_code);
                     
                 }
-                delete msg;
-            }
-
-        p_pipe->clear();
+                break;
+            default:
+                cerr<<"other code? "<<msg->opcode<<endl;
+                break;
+				
         }
-		
+        delete msg;
+        p_pipe->clear();
   
         
     }

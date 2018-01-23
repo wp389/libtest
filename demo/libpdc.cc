@@ -96,6 +96,7 @@ extern "C" int rados_ioctx_create(rados_t vmclient, const char *pool_name,
         msg->mqkeys.semkey= pclient->ackmq->GetSemKey();
         msg->dump("open rados");
         r = pclient->msgmq.push(msg);
+        delete msg;
         if(r<  0 ){
             cerr<<" create remote rados failed"<<endl;
             return -1;
