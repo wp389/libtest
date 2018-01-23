@@ -33,10 +33,10 @@ void pdc_callback(rbd_completion_t cb, void *arg)
             //todo put shmmemory keys .  
             
             if(pdc){
-                vector<u64> index(op->data.indexlist,op->data.indexlist+sizeof(op->data.indexlist)/sizeof(u64));
+                vector<u64> index(op->data.indexlist,op->data.indexlist+op->data.chunksize);
                 n = pdc->slab.put(index);
-                if(r < 0 ){
-                    cerr<<"shm->put falied:"<<r<<endl;
+                if(n < 0 ){
+                    cerr<<"shm->put falied:"<<n <<" and index is:"<<index.size()<<endl;
                     //return ;
                     
                 }

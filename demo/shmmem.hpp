@@ -303,9 +303,11 @@ public:
     int put(vector<u64> &used){
         //semLockGuard oLock(m_Sem);
         vector<u64>::iterator it =used.begin();
-        int size = 0;
-        if(it == used.end())  return -2;
-
+        unsigned int size = 0;
+        if(it == used.end()){
+            cerr<<"to put zero size usedlist?"<<endl;
+            return -2;
+        }
         lock.lock();
         for(;it != used.end();it++){
             freelist.push_back(*it);
