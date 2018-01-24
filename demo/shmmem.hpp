@@ -112,7 +112,7 @@ private:
     };
 
 
-static const uint32_t SHMSIZE = 1024*1024*1024+1024;
+static const uint32_t SHMSIZE = 1024*1024*1024;
 //测试将大小调小，实际使用时应该设大避免影响性能
 
 class SuperBlock {
@@ -171,12 +171,15 @@ public:
             return -1;
         }
         //attach superblock
-        sb = (SuperBlock*)m_pShm;
+        //sb = (SuperBlock*)m_pShm;
+        item_size = sizeof(T);
+		max_idx = SHMSIZE / item_size;
         
         if (m_iCreate == 1 ) {
             if(usetype == 0){
                 cerr<<"init to memory queue model"<<endl;
                 //QueueHead Head;
+                #if 0
                 sb->ItemSize= sizeof(T);
                 sb->AllSize = SHMSIZE  - 1024;
                 sb->AllCount = sb->AllSize / sb->ItemSize;
@@ -189,6 +192,22 @@ public:
                 usedlist.resize(sb->AllCount);
                 //freelist()
                 //::memcpy(m_pShm,&Head,sizeof(QueueHead));
+				#endif
+				idx_array = (u64 *)::malloc(max_idx * sizeof(u64));
+				if (!idx_array) {
+					cerr << "failed to alloc idx_array!!!" << endl;
+					assert(0);
+				}
+
+				/*init idx_array*/
+				for (u64 i = 0; i < max_idx; i++) {
+					idx_array[i] = i;
+				}
+				alloc_cursor = max_idx - 1;
+				num_free_idx = max_idx;
+				cerr << "item_size:" << item_size << " max_idx:" << max_idx
+					<< " alloc_cursor:" << alloc_cursor
+					<< " num_free_idx:" << num_free_idx << endl;
             }else if(usetype ==1){
             
             }
@@ -198,6 +217,9 @@ public:
     }
 
     bool isEmpty() {  //whether had memory to used?
+
+		return (num_free_idx == 0);
+	#if 0
 	 if(sb->Avalid > 0)
             return false;
 	 else if(sb->Avalid == 0)
@@ -207,10 +229,13 @@ public:
             assert(0);
             return true;
 	  }
-    
+	#endif
     }
 
     bool isFull() { // empty  == full ?
+
+		return (num_free_idx == 0);
+		#if 0
         if(sb->Avalid > 0)
             return false;
         else if(sb->Avalid == 0)
@@ -220,39 +245,49 @@ public:
             assert(0);
             return true;
         }
+		#endif
     }
 
     int getSize() {
 
-        return sb->DataCount;
+		return max_idx;
+        //return sb->DataCount;
     }
     u64 getAvalid(){
-        return sb->Avalid;
+
+		return num_free_idx;
+        //return sb->Avalid;
     }
     /* if in one simple thread ,do not use lock
     *   but ,when use in multithreads ,a lock is needed.
     */
-    int  get(u32 size, u64* sum){  //Get memory block, 
+    int get(u32 size, u64* sum){  //Get memory block, 
         //semLockGuard oLock(m_Sem);
         lock.lock();
-        //list<u64> sum;
-        int n =0;
-        if (isFull() ) {
-            cerr<<"shm is full, all:"<<sb->AllCount<<" inuse:"<<sb->Inuse<<
-				" freelist:"<<freelist.size()<<endl;
-            //cerr<<"shm had no memory, can not get one"<<endl;
-            assert(0);
-            return  -1;
-        }
-        if((getAvalid() *(sb->ItemSize)) < size ){
-            cerr<<"shm had no memory, can not get one"<<endl;
-            assert(0);
+
+        if (isFull()) {
+            //cerr<<"shm is full, all:"<<sb->AllCount<<" inuse:"<<sb->Inuse<<
+				//" freelist:"<<freelist.size()<<endl;
+            cerr << "shm is full" << endl; 
             return -1;
         }
+		
+        if (num_free_idx * item_size < size) {
+            cerr << "no enough memory" << endl;
+            return -1;
+        }
+		
         u32 count = 0;
-        count = size /sb->ItemSize;
-        count = ((count * sb->ItemSize ) >=  size)? count :count +1;
-        
+        count = size / item_size;
+        count = ((count * item_size) >=  size) ? count : (count + 1);
+
+		for (u32 i = 0; i < count; i++) {
+			sum[i] = idx_array[alloc_cursor];
+			assert(sum[i] < max_idx);
+			alloc_cursor--;
+		}
+		num_free_idx -= count;
+		#if 0
         while(count > 0){
             //u64 tmp 
             if(sb->Front < sb->AllCount){
@@ -287,37 +322,44 @@ public:
             
     	}
        assert(sb->Inuse + sb->Avalid == sb->AllCount);
-	lock.unlock();
-       //assert((sb->Inuse + sb->Avalid) == sb->AllCount);
-       return n;
-        
+	   #endif
+	   lock.unlock();
+
+        return count;
     }
 
-    T * getaddbyindex(u64 index){
+    T *getaddbyindex(u64 index){
+		#if 0
         if(index  > sb->AllCount ){
             cerr<<"shm count max is:"<<sb->AllCount<<" now use:"<<index<<endl;;
         }
+		#endif
+        assert(index < max_idx);
 
-        return (T *)(m_pShm + 1024 + index * sizeof(T));
+        return (T *)(m_pShm + index * item_size);
     }
     int put(vector<u64> &used){
         //semLockGuard oLock(m_Sem);
-        vector<u64>::iterator it =used.begin();
-        unsigned int size = 0;
-        if(it == used.end()){
-            cerr<<"to put zero size usedlist?"<<endl;
+        if (0 == used.size()) {
+            cerr << "vector size is 0" << endl;
             return -2;
         }
+		
+        unsigned int size = 0;
         lock.lock();
-        for(;it != used.end();it++){
-            freelist.push_back(*it);
+        for (auto& it : used) {
+            assert(it < max_idx);
+            alloc_cursor++;
+            idx_array[alloc_cursor] = it;
+            //freelist.push_back(*it);
             size++;
         }
+        num_free_idx += size;
         //freelist.assign(used.begin(), used.end());
         //freelist.splice(freelist.end(), used, used.begin(), used.end()); //for list
-        sb->Avalid  += size;
-        sb->Inuse -= size;
-        assert(sb->Inuse + sb->Avalid == sb->AllCount);
+        //sb->Avalid  += size;
+        //sb->Inuse -= size;
+        //assert(sb->Inuse + sb->Avalid == sb->AllCount);
         lock.unlock();
         
         return size;
@@ -335,8 +377,13 @@ public:
     int m_iStatus;
     int m_iCreate;
     int m_key;
-    vector<u64> freelist;
-    vector<u64> usedlist;
+    //vector<u64> freelist;
+    //vector<u64> usedlist;
+    u64 *idx_array;
+    u64 max_idx;
+    u64 alloc_cursor;
+    u64 item_size;
+    u64 num_free_idx;
     char *pdata;
     T *pmem;
     SemLock m_Sem;
