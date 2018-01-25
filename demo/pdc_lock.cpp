@@ -12,6 +12,12 @@ PdcLock::PdcLock(string nm):
     pthread_mutex_init(&_mutex,NULL);
     
 }
+PdcLock::PdcLock( ):
+    name("lock"),locked(false)
+{
+    pthread_mutex_init(&_mutex,NULL);
+
+}
 
 void PdcLock::lock()
 {

@@ -78,15 +78,18 @@ public:
     };
 
 public:
-    pthread_mutex_t iomutex;
+    PdcCond opcond;
+    PdcLock iolock;
     list<Msginfo *> ops;
     Iothreads  *iothread;
 
-    pthread_mutex_t finimutex;
-    list<Msginfo *> finishop;
-    Finisherthreads *finisher;
+    PdcCond listencond;
+    PdcLock listenlock;
+    list<Msginfo *> listenop;
+    Finisherthreads *listen;
 
-    pthread_mutex_t msgmutex;
+    PdcCond msgcond;
+    PdcLock msglock;
     list<Msginfo *>msgop;
     Msgthreads *msgthread;
     
@@ -98,9 +101,11 @@ public:
         msgmq(PIPEKEY, MEMQSEM, PIPEWRITE, PIPECLIENT),
         ackmq(NULL),
         performace(NULL),
-        iothread(NULL), msgthread(NULL), finisher(NULL),
+        iothread(NULL), msgthread(NULL), listen(NULL),
         slab(MEMKEY, CLIENTNOCREATE),
-        ref(0)
+        ref(0),iolock("client-iolock"),
+        listenlock("client-listenlock"),
+        msglock("client-msglock")
         {
             pid = getpid();
             time.reset();

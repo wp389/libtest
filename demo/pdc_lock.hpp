@@ -24,6 +24,7 @@ struct PdcLock{
 
 public:
     PdcLock(string nm);
+    PdcLock();
     ~PdcLock() {}
 
     void lock();

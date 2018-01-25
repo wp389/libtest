@@ -5,11 +5,12 @@
 //#include "type.h"
 //#include "shmmem.hpp"
 //#include "pipe.hpp"
+#include <sys/epoll.h>
 #include "backend_ceph.hpp"
 #include "shmmem.hpp"
 #include "pipe.hpp"
 #include "type.h"
-
+#include "pdc_lock.hpp"
 
 using namespace std;
 //using namespace wp::Pipe;
@@ -66,15 +67,19 @@ public:
     };
 
 public:
-    pthread_mutex_t iomutex;
+    PdcCond iocond;
+    PdcLock iolock;
+    //pthread_mutex_t iomutex;
     list<Msginfo *> ops;
     Iothreads  *iothread;
 
-    pthread_mutex_t finimutex;
+    PdcCond listencond;
+    PdcLock listenlock;
     list<Msginfo *> finishop;
-    Finisherthreads *finisher;
+    Finisherthreads *listen;
 
-    pthread_mutex_t msgmutex;
+    PdcCond msgcond;
+    PdcLock msglock;
     list<Msginfo *>msgop;
     Msgthreads *msgthread;
     
@@ -83,8 +88,11 @@ public:
     Pdcserver(string nm): perf(),time(),servername(nm),pid(-1),threadnum(2),
         msgmq(PIPEKEY, PIPESEMKEY, PIPEREAD, PIPESERVER),
         performace(NULL),
-        iothread(NULL), msgthread(NULL), finisher(NULL),
-        slab(MEMKEY, SERVERCREATE)
+        iothread(NULL), msgthread(NULL), listen(NULL),
+        slab(MEMKEY, SERVERCREATE),
+        iolock("client-iolock"),
+        listenlock("client-listenlock"),
+        msglock("client-msglock")
         {pid = getpid();
             time.reset();
         }

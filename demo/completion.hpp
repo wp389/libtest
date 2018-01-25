@@ -23,6 +23,7 @@ struct PdcCompletion{
     void *write_buf;
     u64  buflen;
     int   retcode;
+    int ref;
     u64 opidx;
     Msginfo *op;
     pdc_callback_t callback;
@@ -31,13 +32,13 @@ struct PdcCompletion{
     struct timeval starttime;
 public:
     PdcCompletion(pdc_callback_t cb, void *cb_arg):
-         lock("PdcCompletion"),done(false)
+         lock("PdcCompletion"),ref(1),done(false)
     {
         ::gettimeofday(&starttime ,NULL);
         callback = cb;
         callback_arg = cb_arg;
     }
-    PdcCompletion():lock("PdcCompletion"),done(false)
+    PdcCompletion():lock("PdcCompletion"),ref(1),done(false)
     {}
     ~PdcCompletion() {}
     void setcb(pdc_callback_t cb, void *cb_arg){
@@ -61,17 +62,23 @@ public:
     }
     int wait_for_complete()
     {
+        
         lock.lock();
+        ref++;
         while (!done)
            cond.wait(lock);
         lock.unlock();
+        //ref--;
+        //release();
         return 0;
     }
     void release(){
         //lock;
         //NEED todo?
         //unlock;
-        //delete this;
+        ref--;
+        //if(ref == 0)
+        //    delete this;
     }
 };
 

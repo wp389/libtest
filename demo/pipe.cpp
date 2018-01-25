@@ -29,12 +29,12 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
     string pkey;
     int skey;
     int r;
-
-    newkey<<GetMqKey();
+    pid_t pid= getpid();
+    newkey<<pid<<GetMqKey();
     newkey >>pkey;
-    skey = GetMqKey();
-
-    cerr<<"create client queue:"<<pkey<<" sw is:"<<sw<<endl;
+    skey = GetMqKey() +pid;
+    
+    cerr<<"create client queue:"<<pkey<<" semkey:"<<skey<<" sw is:"<<sw<<endl;
     pdcPipe::PdcPipe<Msginfo>::ptr recvmq = new pdcPipe::PdcPipe<Msginfo>(PIPESERVER);
     recvmq->ResetPipeKey(pkey);
     recvmq->ResetSemKey(skey);

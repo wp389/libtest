@@ -379,7 +379,7 @@ public:
     int m_key;
     //vector<u64> freelist;
     //vector<u64> usedlist;
-    u64 *idx_array;
+    u64 *idx_array[];
     u64 max_idx;
     u64 alloc_cursor;
     u64 item_size;

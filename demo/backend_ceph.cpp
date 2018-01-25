@@ -133,13 +133,21 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
         cerr<<"rados pool:"<<it->first<<" had existed"<<endl;
         if(vols.find(it->second)  != vols.end()){
             cerr<<"rbd "<< it->second<<" had existed"<<endl;
-            //update matedata
+            //update matedata or pipe
+            //TODO:
             
+
+			
         }else{
             cerr<<"rbd "<< it->second<<" register now "<<endl;
             CephBackend::RbdVolume * rbd = new CephBackend::RbdVolume(it->second,itm->second);
             if(rbd->init(1) < 0) return -1;
-            //vols[it->second] = rbd;
+            
+            r = pdcPipe::createserverqueues((void *)&msg->mqkeys,rbd->mq);
+            if(r < 0){
+                cerr<<"create server queues failed"<<endl;
+                return r;
+            }
             vols.insert(pair<string ,RbdVolume*>(it->second ,rbd));
             p_rados->volumes[it->second] = (void *)rbd;
             

@@ -84,14 +84,16 @@ void* Pdcserver::Iothreads::_process()
     while(1){
         if(stop()) continue;
         
-        pthread_mutex_lock(&pdc->iomutex);
-        if(pdc->ops.empty()){
-            pthread_mutex_unlock(&pdc->iomutex);
-            continue;
-        }
-        Msginfo *op = pdc->ops.front();
-        pdc->ops.pop_front();
-        pthread_mutex_unlock(&pdc->iomutex);
+        pdc->iolock.lock();
+
+        //pdc->iocond.wait(pdc->iolock);
+        list<Msginfo *> oplist;
+        oplist.swap(pdc->ops);
+        pdc->iolock.unlock();
+
+        while(!oplist.empty()){
+        Msginfo *op = oplist.front();
+        oplist.pop_front();
 
         op->dump("server io tp op");
         pdc->OpFindClient(op);
@@ -102,6 +104,8 @@ void* Pdcserver::Iothreads::_process()
             continue;
         }
         sum++;
+        switch(op->opcode){
+        case PDC_AIO_WRITE:
         if(SERVER_IO_BLACKHOLE){    //black hole
         rbd_completion_t comp;
         u64 off = op->data.offset;
@@ -114,8 +118,8 @@ void* Pdcserver::Iothreads::_process()
             //memset(op->data.pdata, 6, op->data.len);
             simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
             //TODO: WRITE
-            lengh = bufsize > sizeof(simpledata) ? sizeof(simpledata):bufsize;
-            vol->do_aio_write(op, off+ i*sizeof(simpledata), lengh, (char *)pdata, comp);   
+            lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
+            vol->do_aio_write(op, off+ i*CHUNKSIZE, lengh, (char *)pdata, comp);   
         }
         //cerr<<"do rbd write---------:"<<sum<<endl;
         }else{
@@ -127,53 +131,134 @@ void* Pdcserver::Iothreads::_process()
             pdc_callback(NULL, op);
 
         }
+        break;
+        default:
+            assert(0);
+            break;
     }
-
+    }
+    }
     return 0;
 }
 
 
-void* Pdcserver::Finisherthreads::_process()
+int handle_listen_events(Pdcserver *pdc, Msginfo* op)
 {
-    int r;
-    u64 sum = 0;
+    static u64 sum =0;
+    /*
     Pdcserver *pdc = (Pdcserver *)server;
-    CephBackend::RbdVolume *prbd;
-    pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
-    cerr<<"listen thread "<<pthread_self()<<" start"<<endl;
-    
-    while(1){
-        if(stop()) continue;
-        Msginfo *msg = pdc->msgmq.pop();
+     Msginfo *msg = pdc->msgmq.pop();
         if(!msg){
             continue;
         }
         Msginfo *op = new Msginfo();
         op->copy(msg);
         pdc->msgmq.clear();
-
-        if(op){
-        op->dump("listen thread get op");
-        if(op->opcode == PDC_AIO_WRITE){
+   */  
+        if(op)
+            op->dump("listen thread get op");
+        switch(op->opcode){
+        case PDC_AIO_WRITE:
             //op->opcode == PDC_AIO_WRITE;
-            pthread_mutex_lock(&pdc->iomutex);
+            pdc->iolock.lock();
             pdc->ops.push_back(op);
-            pthread_mutex_unlock(&pdc->iomutex);
-        }
-        else if(op->opcode == GET_MEMORY){
-            pthread_mutex_lock(&pdc->msgmutex);
+            //pdc->iocond.Signal();
+            pdc->iolock.unlock();
+            
+            break;
+        case GET_MEMORY:
+            pdc->msglock.lock();
             pdc->msgop.push_back(op);
-            pthread_mutex_unlock(&pdc->msgmutex);
-        }else{
-            pthread_mutex_lock(&pdc->msgmutex);
+            //pdc->msgcond.Signal();
+            pdc->msglock.unlock();
+            	
+            break;
+        default:  //mgr cmd
+            pdc->msglock.lock();
             pdc->msgop.push_back(op);
-            pthread_mutex_unlock(&pdc->msgmutex);
-
+            //pdc->msgcond.Signal();
+            pdc->msglock.unlock();
+            
+            break;
         }
         sum++;
+
+
+
+}
+void* Pdcserver::Finisherthreads::_process()
+{
+    int r;
+    int epfd;
+    int curfds = 0;
+    int fds, n;
+    int listenfd;
+    u64 sum = 0;
+    struct epoll_event ev;
+    struct epoll_event events[EPOLLSIZE];
+    Pdcserver *pdc = (Pdcserver *)server;
+    CephBackend::RbdVolume *prbd;
+    pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
+    cerr<<"listen thread  start"<<endl;
+    r = pdc->msgmq.openpipe();
+    if(r< 0){
+        cerr<<"listen pipe open failed "<<r<<endl;
+        return NULL;
+    }
+    epfd = ::epoll_create(EPOLLSIZE);  
+    if(epfd < 0 ){
+        cerr<<"epoll create failed :"<<epfd<<endl;
+        //return NULL;
+    }
+    listenfd = pdc->msgmq.GetFd();
+    ev.events = EPOLLIN ;
+    ev.data.fd = listenfd;
+    curfds++;
+    if (::epoll_ctl (epfd, EPOLL_CTL_ADD, listenfd, &ev) < 0){
+        cerr<<"epoll set insertion error: fd="<<listenfd<<endl;  
+        return -1;  
+    }  
+    else  
+        cerr<<"监听 PIPE 加入 epoll 成功"<<endl; 
+	
+    while(1){
+        if(stop()) continue;
+
+        fds = epoll_wait (epfd, events, EPOLLSIZE, -1);
+        if(fds == -1){
+            if(errno == EINTR) continue;
+            else {
+                cerr<<"epoll wait error:"<<strerror(errno)<<endl;;
+                break;
+            }
+        }
+        int tfd;
+        int bufsize = sizeof(Msginfo);
+        for(n = 0; n<fds ;n ++){
+            tfd = events[n].data.fd;    //tmp fd
+            /*if all client use one fifo to write ,then tfd== listenfd ,just do read
+            * if every client use it's own fifo fd, then tfd == listenfd ,
+            * we need to check if need to add new fd to epoll
+            */
+            //if(MULTIPIPE)
+            if(( tfd == listenfd )&& (events[n].events & EPOLLIN)){  //
+                Msginfo *op = new Msginfo();
+                r = ::read(tfd, op, bufsize);
+                if(r == bufsize){
+                    r = handle_listen_events(server,op);
+                    
+                }else{
+                    cerr<<"pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+                    
+                }
+            }else{
+                //cerr<<" fds:"<<fds <<" now is:"<<n<<" fd :"<<tfd<<endl;
+            }
+
+        }
+        
         //op->dump("server finish tp op");
         //cerr<<" get a finish op ,do pop"<<endl;
-        }
     }
 
 return 0;
@@ -190,20 +275,22 @@ void* Pdcserver::Msgthreads::_process()
     Pdcserver *pdc = (Pdcserver *)server;
     cerr<<"MSGthread "<<pthread_self()<<" start"<<endl;
 
+    //pdc->msglock.lock();
     while(1){
         if(stop() ) continue;
-        //while(!pdc->msgop.empty()){
-        if(1){
-        pthread_mutex_lock(&pdc->msgmutex);
-        if(pdc->msgop.empty()){
-            pthread_mutex_unlock(&pdc->msgmutex);
-            continue;
-        }
-        Msginfo *msg = pdc->msgop.front();
-        pdc->msgop.pop_front();
-        pthread_mutex_unlock(&pdc->msgmutex);
-        if(!msg) continue;
 
+        //while(pdc->msgop.empty){
+        pdc->msglock.lock();
+        //pthread_cond_wait(&pdc->msgcond, &pdc->msgmutex);
+        //pdc->msgcond.wait(pdc->msglock);
+        
+        list<Msginfo *> oplist;
+        oplist.swap(pdc->msgop);
+        pdc->msglock.unlock();
+
+        while(!oplist.empty()){
+            Msginfo *msg =oplist.front();
+            oplist.pop_front();
         if(msg){
             sum++;
             assert(msg);
@@ -213,13 +300,11 @@ void* Pdcserver::Msgthreads::_process()
             client[msg->client.pool] = msg->client.volume;
             //perf.inc();
             switch(msg->opcode){
-            //if(msg->opcode == OPEN_RADOS){
             case OPEN_RADOS:
             {
                 pdc->register_connection(msg);
                 break;
             }
-            //}else if(msg->opcode == OPEN_RBD){
             case OPEN_RBD:
             {
                 r = pdc->register_vm(client, msg);
@@ -229,10 +314,8 @@ void* Pdcserver::Msgthreads::_process()
                 }
                 break;
             }
-            //}else if(msg->opcode == GET_MEMORY){
             case GET_MEMORY:
             {
-                //vector<u64> listadd ;
                 pdc->OpFindClient(msg);
                 r = pdc->slab.get(msg->data.len, msg->data.indexlist);
                 if(r <= 0){
@@ -241,11 +324,10 @@ void* Pdcserver::Msgthreads::_process()
                 }
                 msg->data.chunksize = r;
                 msg->opcode = ACK_MEMORY;
-                //msg->data.indexlist.swap(listadd);
                 pdcPipe::PdcPipe<Msginfo>::ptr pipe;
                 vol = reinterpret_cast<CephBackend::RbdVolume *>(msg->volume);
                 pipe =reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(vol->mq[SENDMQ]);
-                //pipe = server->ackmq[client];
+                assert(pipe);
                 r = pipe->push(msg);
                 if(r < 0){
                     msg->dump("push failed");
@@ -254,16 +336,8 @@ void* Pdcserver::Msgthreads::_process()
                 }
                 break;
             }
-            //}else if(msg->opcode == PDC_AIO_WRITE){
             default:
             {
-                /*
-
-                pdc->OpFindClient(msg);
-                pthread_mutex_lock(&pdc->iomutex);
-                server->ops.push_back(msg);
-                pthread_mutex_unlock(&pdc->iomutex);
-                */
                 cerr<<"opcode error:"<<msg->opcode<<endl;
                 assert(0);
                 break;
@@ -273,9 +347,13 @@ void* Pdcserver::Msgthreads::_process()
         }
         delete msg;
        }
-       
+
+       //pdc->msglock.lock();
+       //pdc->msgcond.wait(pdc->msglock);
+      //}
     }
 
+    //pdc->msglock.unlock();
 return 0;
 
 }
@@ -299,28 +377,31 @@ int Pdcserver::init()
         cerr<<"slab init faled:"<<ret<<endl;
         return -1;
     }
-
+    
     //msgmq = new wp::Pipe::Pipe(PIPEKEY, MEMQSEM, PIPEREAD,wp::Pipe::SYS_t::PIPESERVER);
     ret = msgmq.Init();
     if(ret < 0){
         cerr<<"msgmq init faled:"<<ret<<endl;
     }
-    pthread_mutex_init(&iomutex,NULL);
+    //pthread_cond_init(&iocond);
+    //pthread_mutex_init(&iomutex,NULL);
     iothread = new Pdcserver::Iothreads("IO-threadpool", this);
     iothread->init(1);
 
-    pthread_mutex_init(&msgmutex,NULL);
+    //pthread_cond_init(&msgcond);
+    //pthread_mutex_init(&msgmutex,NULL);
     msgthread = new Msgthreads("MSG-threadpool",this);
     msgthread->init(2);
 
-    pthread_mutex_init(&finimutex,NULL);
-    finisher = new Finisherthreads("Finisher threadpool", this);
-    finisher->init(1);	
+    //pthread_cond_init(&finicond);
+    //pthread_mutex_init(&finimutex,NULL);
+    listen = new Finisherthreads("Finisher threadpool", this);
+    listen->init(1);	
     ops.clear();
     finishop.clear();
     msgop.clear();
 
-    finisher->start();
+    listen->start();
     iothread->start();
     msgthread->start();
     

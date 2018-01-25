@@ -20,7 +20,7 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <memory.h>
-
+#include <memory>
 //#define LOCALTEST 1
 //#include "pipe.hpp"
 typedef unsigned long long u64;
@@ -51,6 +51,10 @@ extern u64 opid;
 #define CLIENTNOCREATE 0
 
 #define SERVER_IO_BLACKHOLE 0
+
+#define MULTIPIPE 0
+#define CHUNKSIZE 4096
+#define EPOLLSIZE 1024
 using namespace std;
 //using namespace wp::Pipe;
 //using namespace pdcPipe::PdcPipe;
@@ -64,7 +68,7 @@ typedef enum{
 }ThreadType;
 
 struct simpledata{
-    char data[4096];
+    char data[CHUNKSIZE];
 };
 struct pdcdata{
     void * c;

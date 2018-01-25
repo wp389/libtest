@@ -209,7 +209,7 @@ public:
 
 				return 0;
 			}
-
+                    
                     int openpipe(){
                         if(fd != -1) return 0;
                         fd = ::open(m_key.c_str(), m_model);

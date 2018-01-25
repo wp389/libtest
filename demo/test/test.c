@@ -18,7 +18,7 @@ typedef unsigned long long u64;
 #define VOLUME "qemu-1"
 #define POOL "wptest"
 
-
+#define TEST 1000
 void rbd_aio_cb(rbd_completion_t c, void*arg)
 {
     int r;
@@ -28,6 +28,7 @@ void rbd_aio_cb(rbd_completion_t c, void*arg)
         printf("rbd_aio_cb ,return failed ,r= %u \n",r);
      
     }
+    printf("cb idx: %u\n",*(int*)arg);
     ///rbd_aio_release(c);
 
 }
@@ -61,19 +62,22 @@ int main()
     struct timeval start;
     struct timeval end;
 
-   u64 retry = 10000;
+   u64 retry = TEST;
    u64 n=0;
    len = TEST_SIZE;
    char test[] = "io qdpth =1";
-   rbd_completion_t *c = (rbd_completion_t*)malloc(sizeof(rbd_completion_t) *(retry +1));
+   rbd_completion_t *c = (rbd_completion_t*)malloc(sizeof(rbd_completion_t) *(TEST +1));
+   int idx[TEST+1];
    gettimeofday(&start, NULL);
     while(retry){
         n++;
-        r = rbd_aio_create_completion(test, (rbd_callback_t)rbd_aio_cb, &c[retry]);
+        idx[n] = n;
+        r = rbd_aio_create_completion(&idx[n], (rbd_callback_t)rbd_aio_cb, &c[retry]);
         r = rbd_aio_write(img, n*2048, len, buf, c[retry]);
-	 
+	 //rbd_aio_wait_for_complete( c[retry]);
        retry--;
     }
+    
     rbd_aio_wait_for_complete( c[++retry]);
     gettimeofday(&end , NULL);
     printf("test io count: %u \n",n);
