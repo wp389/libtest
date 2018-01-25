@@ -216,7 +216,7 @@ void* Pdcserver::Finisherthreads::_process()
     curfds++;
     if (::epoll_ctl (epfd, EPOLL_CTL_ADD, listenfd, &ev) < 0){
         cerr<<"epoll set insertion error: fd="<<listenfd<<endl;  
-        return -1;  
+        return NULL;  
     }  
     else  
         cerr<<"监听 PIPE 加入 epoll 成功"<<endl; 
