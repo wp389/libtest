@@ -106,7 +106,7 @@ void* Pdcserver::Iothreads::_process()
         sum++;
         switch(op->opcode){
         case PDC_AIO_WRITE:
-        if(SERVER_IO_BLACKHOLE){    //black hole
+        if(!SERVER_IO_BLACKHOLE){    //black hole
         rbd_completion_t comp;
         u64 off = op->data.offset;
         u32 bufsize = op->data.len;
@@ -145,16 +145,7 @@ void* Pdcserver::Iothreads::_process()
 int handle_listen_events(Pdcserver *pdc, Msginfo* op)
 {
     static u64 sum =0;
-    /*
-    Pdcserver *pdc = (Pdcserver *)server;
-     Msginfo *msg = pdc->msgmq.pop();
-        if(!msg){
-            continue;
-        }
-        Msginfo *op = new Msginfo();
-        op->copy(msg);
-        pdc->msgmq.clear();
-   */  
+
         if(op)
             op->dump("listen thread get op");
         switch(op->opcode){
@@ -186,6 +177,36 @@ int handle_listen_events(Pdcserver *pdc, Msginfo* op)
 
 
 }
+
+int add_event(Pdcserver *pdc, int epfd, struct epoll_event &ev, Msginfo *op, int listen_fd)
+{
+    int r;
+    ev.events = EPOLLIN;
+    if(listen_fd != 0)
+        ev.data.fd = listen_fd;
+    else{
+        if(op){
+            CephBackend::RbdVolume *vol;
+            pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
+            pdc->OpFindClient( op);
+            vol = reinterpret_cast<CephBackend::RbdVolume *>(op->volume);
+            p_pipe =reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(vol->mq[RECVMQ]);
+            ev.data.fd = p_pipe->GetFd();
+            if(ev.data.fd < 0 ){
+                cerr<<"add_event fd is "<<ev.data.fd<<" maybe not opened"<<endl;
+                return  -1;
+            }
+        }
+    }
+    if (::epoll_ctl(epfd, EPOLL_CTL_ADD, ev.data.fd, &ev) < 0){
+        cerr<<"epoll set insertion error: fd="<<ev.data.fd<<endl;  
+        return -1;  
+    }else {  
+        cerr<<"listening PIPE insert epoll success"<<endl; 
+	
+    }
+    return 0;
+}
 void* Pdcserver::Finisherthreads::_process()
 {
     int r;
@@ -211,15 +232,8 @@ void* Pdcserver::Finisherthreads::_process()
         //return NULL;
     }
     listenfd = pdc->msgmq.GetFd();
-    ev.events = EPOLLIN ;
-    ev.data.fd = listenfd;
+    add_event(pdc,epfd, ev, NULL, listenfd);
     curfds++;
-    if (::epoll_ctl (epfd, EPOLL_CTL_ADD, listenfd, &ev) < 0){
-        cerr<<"epoll set insertion error: fd="<<listenfd<<endl;  
-        return NULL;  
-    }  
-    else  
-        cerr<<"监听 PIPE 加入 epoll 成功"<<endl; 
 	
     while(1){
         if(stop()) continue;
@@ -241,17 +255,31 @@ void* Pdcserver::Finisherthreads::_process()
             * we need to check if need to add new fd to epoll
             */
             //if(MULTIPIPE)
+            Msginfo *op = new Msginfo();
+            r = ::read(tfd, op, bufsize);
+            
             if(( tfd == listenfd )&& (events[n].events & EPOLLIN)){  //
-                Msginfo *op = new Msginfo();
-                r = ::read(tfd, op, bufsize);
-                if(r == bufsize){
-                    r = handle_listen_events(server,op);
-                    
+                if(op->opcode == PDC_ADD_EPOLL){ // MULTI model to add epoll listen
+                    op->("pdc add epoll");
+                    if(MULTIPIPE)
+                       add_event(pdc, epfd, ev, op, 0);
+                       curfds++;
+                       //ev.data.fd = ;
+                    delete op;
                 }else{
-                    cerr<<"pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
-                    
+                  if(r == bufsize){
+                       r = handle_listen_events(server,op);
+                  }else{
+                       cerr<<"pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+                  }
                 }
             }else{
+                if(r == bufsize){
+                    r = handle_listen_events(server,op);
+                }else{
+                        // need  delete ?
+                        cerr<<"pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+                }
                 //cerr<<" fds:"<<fds <<" now is:"<<n<<" fd :"<<tfd<<endl;
             }
 
@@ -271,6 +299,7 @@ void* Pdcserver::Msgthreads::_process()
     int r;
     u64 sum = 0;
     CephBackend::RbdVolume *vol;
+    pdcPipe::PdcPipe<Msginfo>::ptr pipe;
 
     Pdcserver *pdc = (Pdcserver *)server;
     cerr<<"MSGthread "<<pthread_self()<<" start"<<endl;
@@ -278,11 +307,7 @@ void* Pdcserver::Msgthreads::_process()
     //pdc->msglock.lock();
     while(1){
         if(stop() ) continue;
-
-        //while(pdc->msgop.empty){
         pdc->msglock.lock();
-        //pthread_cond_wait(&pdc->msgcond, &pdc->msgmutex);
-        //pdc->msgcond.wait(pdc->msglock);
         
         list<Msginfo *> oplist;
         oplist.swap(pdc->msgop);
@@ -314,6 +339,13 @@ void* Pdcserver::Msgthreads::_process()
                 }
                 break;
             }
+            case PDC_AIO_STAT:
+                //pdc->OpFindClient(msg);
+                //vol = reinterpret_cast<CephBackend::RbdVolume *>(msg->volume);
+                //pipe =reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(vol->mq[SENDMQ]);
+
+
+                break;
             case GET_MEMORY:
             {
                 pdc->OpFindClient(msg);
@@ -397,6 +429,7 @@ int Pdcserver::init()
     //pthread_mutex_init(&finimutex,NULL);
     listen = new Finisherthreads("Finisher threadpool", this);
     listen->init(1);	
+
     ops.clear();
     finishop.clear();
     msgop.clear();
@@ -440,19 +473,7 @@ int Pdcserver::register_vm(map<string,string > &client, Msginfo *msg)
     cerr<<"register vm:"<<client.size()<<endl;
     cephcluster->register_client(client,msg);
 
-    /*
-    map<string,string>::iterator it = client.begin();
-    if(it != client.end()){
-        cerr<<"register pipe:"<<it->first<<" "<<it->second<<endl;
-        CephBackend::RadosClient *rados = clusters[nm]->radoses[it->first];
-        CephBackend::RbdVolume *prbd = reinterpret_cast<CephBackend::RbdVolume *>(rados->volumes[it->second]);
-        pdcPipe::PdcPipe<Msginfo>::ptr mq =  reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);  
-        //ackmq.insert(map<map<string,string>, pdcPipe::PdcPipe<Msginfo>*  >(pair(client,mq)));
-        assert(mq);
-        ackmq[client] = mq;
 
-    }
-    */
 return 0;
 }
 

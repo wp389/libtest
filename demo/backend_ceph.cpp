@@ -16,7 +16,7 @@ int CephBackend::RadosClient::init(int create = 0)
     int r;
     cerr<<"start to connect rados:"<<radosname<<endl;
   if(create == 1){
-
+  if(!SERVER_IO_BLACKHOLE){
     r= rados_create(&cluster ,NULL);
     if(r< 0){
         cerr<<"create rados failed:"<<radosname<<" r="<<r<<endl;
@@ -37,6 +37,7 @@ int CephBackend::RadosClient::init(int create = 0)
         cerr<<"create rados ioctx failed:"<<radosname<<" r="<<r<<endl;
         return r;
     }  
+    }
   }
     return 0;
 }
@@ -51,11 +52,13 @@ int CephBackend::RbdVolume::init(int create = 0)
     //cerr<<"start to connect rbd:"<<rbdname<<endl;
     
     if(create == 1){
+        if(!SERVER_IO_BLACKHOLE){
         r = rbd_open(rados->ioctx, rbdname.c_str(), &image , NULL);
         if(r< 0){
             cerr<<"open rbd volume failed:"<<rbdname<<" r="<<r<<endl;
             return r;
         }  
+        }
     }
     return 0;
 }
@@ -125,17 +128,22 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
         return -1;
     }
     //msg->dump("register_client");
-    cerr<<"vmclient:"<<vmclient.size()<<" radoses:"<<radoses.size()<<endl;
+    //cerr<<"vmclient:"<<vmclient.size()<<" radoses:"<<radoses.size()<<endl;
     map<string ,string>::iterator it = vmclient.begin();
     map<string, RadosClient*>::iterator itm = radoses.find(it->first);
     if(itm  != radoses.end()){
         p_rados = itm->second;
         cerr<<"rados pool:"<<it->first<<" had existed"<<endl;
-        if(vols.find(it->second)  != vols.end()){
-            cerr<<"rbd "<< it->second<<" had existed"<<endl;
+        if(p_rados->volumes.find(it->second)  != p_rados->volumes.end()){
+            cerr<<"rbd "<< it->second<<" had existed and update pipe"<<endl;
             //update matedata or pipe
             //TODO:
-            
+            CephBackend::RbdVolume * rbd = reinterpret_cast<CephBackend::RbdVolume *>(p_rados->volumes[it->second]);
+            r = pdcPipe::updateserverqueues((void *)&msg->mqkeys,rbd->mq);
+            if(r < 0){
+                cerr<<"update server queues failed"<<endl;
+                return r;
+            }
 
 			
         }else{

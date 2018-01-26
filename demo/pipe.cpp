@@ -12,16 +12,37 @@ int atokey = 251;
 int GetMqKey() { cerr<<"Getkey:"<<atokey<<endl;return atokey++; }
 namespace pdcPipe{
 
+/*
+client pipe with server pipe mapping info:
+client:	sendmq		recvmq
+server:	recvmq		sendmq
 
+*/
 void copymqs(map<string ,void *> &mqs,PdcPipe<Msginfo>* send, PdcPipe<Msginfo>*recv)
 {
     cerr<<"RBD USE RADOS'S pipes mq"<<endl;
     assert(send);
     assert(recv);
     mqs.insert(pair<string,void *>("recv", (void*)recv));
+    if(send)
     mqs.insert(pair<string,void *>("send", (void*)send));
 
 
+}
+int createpublicqueues(map<string ,void *> &mqs,bool sw)
+{
+    int r;
+    
+    if(sw){   //sw = true means: client
+        pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPEKEY,PIPESEMKEY,PIPEWRITE ,PIPECLIENT);
+        r = sendmq->Init();
+        if(r < 0){
+            cerr<<"create recvmq failed:"<< r <<endl;
+        }
+        mqs.insert(pair<string,void *>("send", (void*)sendmq));
+    }
+
+    return r;
 }
 int createclientqueues(map<string ,void *> &mqs,bool sw)
 {
@@ -30,7 +51,7 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
     int skey;
     int r;
     pid_t pid= getpid();
-    newkey<<pid<<GetMqKey();
+    newkey<<"/tmp/"<<pid<<GetMqKey();
     newkey >>pkey;
     skey = GetMqKey() +pid;
     
@@ -42,12 +63,19 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
     if(r < 0){
         cerr<<"create recvmq failed:"<<r<<endl;
     }
-    //if(!sw)
-    if(1){
-        pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPEKEY,PIPESEMKEY,PIPEWRITE ,PIPECLIENT);
+
+    if(MULTIPIPE){
+        newkey<<"/tmp/"<<pid<<GetMqKey();
+        newkey >>pkey;
+        skey = GetMqKey() +pid;
+        
+        //pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPEKEY,PIPESEMKEY,PIPEWRITE ,PIPECLIENT);
+        pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPECLIENT);
+        sendmq->ResetPipeKey(pkey);
+        sendmq->ResetSemKey(skey);
         r = sendmq->Init();
         if(r < 0){
-            cerr<<"create recvmq failed:"<<r<<endl;
+            cerr<<"create sendmq failed:"<< r <<endl;
         }
         mqs.insert(pair<string,void *>("send", (void*)sendmq));
     }
@@ -57,6 +85,7 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
 
     return 0;
 }
+
 
 
 /* for client is send mq, for server is recv mq. msg is client's info,
@@ -78,15 +107,50 @@ int createserverqueues(void * mqkeys,map<string ,void *> &mqs)
         sendmq->ResetSemKey(pk->semkey);
         r = sendmq->Init();
         if(r < 0){
+            cerr<<"create send failed:"<< r <<endl;
+            return -1;
+        }
+        
+        r = sendmq->openpipe();
+        mqs.insert(pair<string,void *>(SENDMQ, (void*)sendmq));
+    }
+
+    if(1){
+        // SERVER's 
+        
+        pdcPipe::PdcPipe<Msginfo>::ptr recvmq = new pdcPipe::PdcPipe<Msginfo>(PIPESERVER);
+        recvmq->ResetPipeKey(pk->recvkey);
+        recvmq->ResetSemKey(pk->recvsem);
+        r = recvmq->Init();
+        if(r < 0){
             cerr<<"create recvmq failed:"<<r<<endl;
             return -1;
         }
-    
-        mqs.insert(pair<string,void *>(SENDMQ, (void*)sendmq));
+        r = recvmq->openpipe();
+        mqs.insert(pair<string,void *>(RECVMQ, (void*)recvmq));
+
     }
 	
     return 0;
 }
+
+int updateserverqueues(void * mqkeys,map<string ,void *> &mqs)
+{
+    int r;
+    pdcPipe::PdcPipe<Msginfo>::ptr mq;
+    map<string , void *>::iterator it;
+    
+    for(it = mqs.begin(); it != mqs.end();it++){
+        cerr<<"delete pipe :"<<it->first<<endl;
+        mq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>::ptr>(it->second);
+        delete mq;
+    }
+    mqs.clear();
+
+    r = createserverqueues(mqkeys, mqs);
+    return r;
+}
+
 
     
 }

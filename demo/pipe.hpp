@@ -25,9 +25,10 @@ using namespace std;
 //namespace wp {
 namespace pdcPipe {
 	struct pkey{
-		char key[NAMELENTH];
-		int semkey;
-		
+           char key[NAMELENTH];
+           int semkey;
+           char recvkey[NAMELENTH];
+           int recvsem;
 	};
 
 class SemLock {
@@ -154,6 +155,9 @@ public:
         }
 
         ~PdcPipe() {
+            if(t) delete t;
+            ::close(fd);
+            unlink(m_key.c_str());
         }
         typedef PdcPipe<T>* ptr;
 			int Init(){
@@ -212,7 +216,9 @@ public:
                     
                     int openpipe(){
                         if(fd != -1) return 0;
+                        cerr<<"start open:"<<m_key<<endl;
                         fd = ::open(m_key.c_str(), m_model);
+                        cerr<<"end open:"<<m_key<<endl;
                         if(fd < 0 ){
                            cerr<<"open m_key:"<<m_key <<" fd:"<<fd<<" failed"<<endl;
 			       return -1;
@@ -273,6 +279,7 @@ public:
 
 	extern void copymqs(map<string ,void *> &mqs,PdcPipe<Msginfo>* send, 
 	                                   PdcPipe<Msginfo>*recv);
+       extern int updateserverqueues(void * mqkeys,map<string ,void *> &mqs);
 	extern int createclientqueues(map<string ,void *> &mqs,bool sw);
 	
 	extern int createserverqueues(void * mqkeys,map<string ,void *> &mqs);

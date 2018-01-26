@@ -175,6 +175,8 @@ public:
 typedef enum {
     OPEN_RADOS = 0xa,	//10
     OPEN_RBD,			//11
+    PDC_AIO_STAT,
+    PDC_ADD_EPOLL,
     PDC_AIO_WRITE,		//12
     PDC_AIO_READ,		//13
     GET_MEMORY,			//14
@@ -244,8 +246,10 @@ struct PdcClientInfo{
 };
 
 struct pipekey{
-    char key[NAMELENTH];
+    char key[NAMELENTH];  //for client is recv , for server is send
     int semkey;
+    char recvkey[NAMELENTH];
+    int recvsem;
     pipekey() {};
 };
 struct  Msginfo{
@@ -323,6 +327,9 @@ struct  Msginfo{
         if(1){
             cerr<<" ,pipe recv keys:"<<mqkeys.key;
             cerr<<" ,sem recv keys:"<<mqkeys.semkey;
+            cerr<<" ,pipe send keys:"<<mqkeys.recvkey;
+            cerr<<" ,sem send keys:"<<mqkeys.recvsem;
+
         }
 
         if(data.chunksize > 0){

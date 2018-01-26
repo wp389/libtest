@@ -278,7 +278,10 @@ int PdcClient::init()
     if(ret < 0){
         cerr<<"slab init faled:"<<ret<<endl;
     }
+
     map<string, void *>mqs;
+    mqs.clear();
+    
     r = pdcPipe::createclientqueues(mqs, true);  //false means to create send pipe
     if(r< 0){
         cerr<<"pdc client init recvmq failed"<<endl;
@@ -286,27 +289,23 @@ int PdcClient::init()
     }
     
     ackmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >( mqs[RECVMQ]);
-
+    sendmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >( mqs[SENDMQ]);
+    
     //msgmq = new wp::Pipe::Pipe(PIPEKEY, MEMQSEM, PIPEREAD,wp::Pipe::SYS_t::PIPESERVER);
     ret = msgmq.Init();
     if(ret < 0){
         cerr<<"msgmq init faled:"<<ret<<endl;
     }
 
-    //pthread_cond_init(&opcond);
-    //pthread_mutex_init(&iomutex,NULL);
     iothread = new PdcClient::Iothreads("IO-threadpool", this);
     iothread->init(1);
 
-    //pthread_cond_init(&msgcond);
-    //pthread_mutex_init(&msgmutex,NULL);
     msgthread = new Msgthreads("MSG-threadpool",this);
     msgthread->init(1);
 
-    //pthread_cond_init(&listencond);
-    //pthread_mutex_init(&finimutex,NULL);
     listen = new Finisherthreads("Finisher threadpool", this);
     listen->init(1);	
+	
     ops.clear();
     listenop.clear();
     msgop.clear();

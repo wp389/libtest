@@ -8,3 +8,7 @@ shmmemory change  init  method
 suport multi client to run ,
 fio with blockhole is 160k iops.
 
+2018:1-26
+multiclient can run to 200k iops with 1ms latency
+increase some multipipe function but not enabled
+

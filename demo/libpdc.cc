@@ -63,6 +63,7 @@ extern "C" int rados_connect(rados_t cluster)
 //int pdc_connect_rados(pdc_rados_t vmclient)
 {
     PdcClient * pclient = reinterpret_cast<PdcClient *>(cluster);
+    pclient->inc_ref();
     cerr<<"pdc_connect_rados "<<endl;
     return 0;
 }
@@ -84,6 +85,7 @@ extern "C" int rados_ioctx_create(rados_t vmclient, const char *pool_name,
     map<string ,BackendClient::RadosClient *>::iterator it = pceph->radoses.find(radosname);
     if(it == pceph->radoses.end()){  // not exist ,create a new one
         prados = new BackendClient::RadosClient(radosname, "/etc/ceph/ceph.conf",pceph);
+        prados->init(0);
         pceph->radoses[radosname] = prados;
             
         Msginfo *msg = new Msginfo();
@@ -91,9 +93,15 @@ extern "C" int rados_ioctx_create(rados_t vmclient, const char *pool_name,
         strcpy(msg->client.cluster,"ceph");
         strcpy(msg->client.pool,pool_name);
     
-
         strcpy(msg->mqkeys.key , pclient->ackmq->Getkeys());
-        msg->mqkeys.semkey= pclient->ackmq->GetSemKey();
+        msg->mqkeys.semkey = pclient->ackmq->GetSemKey();
+        if(MULTIPIPE){
+            strcpy(msg->mqkeys.recvkey, pclient->sendmq->Getkeys());
+            msg->mqkeys.recvsem = pclient->sendmq->GetSemKey();  //client's send is server's recv
+        }else{
+            strcpy(msg->mqkeys.recvkey, pclient->msgmq.Getkeys());
+            msg->mqkeys.recvsem = pclient->msgmq.GetSemKey();  //client's send is server's recv
+        }
         msg->dump("open rados");
         r = pclient->msgmq.push(msg);
         delete msg;
@@ -147,7 +155,8 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
     string poolname;
     PdcClient *pdcclient = pdc_client_mgr;
 
-    BackendClient::RbdVolume*prbd;
+    BackendClient::RbdVolume*prbd;   
+    pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
     //PdcClient * pclient = pdc_client_mgr;
     BackendClient::RadosClient *prados = reinterpret_cast<BackendClient::RadosClient *>(ioctx);
 
@@ -157,9 +166,11 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
         *image = (void *)prbd;
     }else {    //NOT EXIST
         prbd = new BackendClient::RbdVolume(rbdname, prados);
-        
-        pdcPipe::copymqs(prbd->mq, &pdcclient->msgmq,pdcclient->ackmq);     
-        
+        prbd->init(0);
+        if(MULTIPIPE)
+            pdcPipe::copymqs(prbd->mq, pdcclient->sendmq,pdcclient->ackmq);     
+        else
+            pdcPipe::copymqs(prbd->mq, &pdcclient->msgmq,pdcclient->ackmq);
         r = prbd->init(0);
         if(r< 0){
             cerr<<"client create new rbd:"<<rbdname<<" failed :"<<r<<endl;
@@ -169,6 +180,7 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
         prados->volumes[rbdname] = (void *)prbd;
 		
     pdcPipe::PdcPipe<Msginfo>::ptr recvmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[RECVMQ]);
+    pdcPipe::PdcPipe<Msginfo>::ptr sendmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
     //msginfo will change to msgpool list  next step
     Msginfo *msg = new Msginfo();
     msg->opcode = OPEN_RBD;
@@ -176,21 +188,38 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
     strcpy(msg->client.cluster,"ceph");
     strcpy(msg->client.pool, prados->GetName());
     strcpy(msg->client.volume,rbd_name);
-    strcpy(msg->mqkeys.key,recvmq->Getkeys());
+    strcpy(msg->mqkeys.key,recvmq->Getkeys());  //client recv pipe
     msg->mqkeys.semkey = recvmq->GetSemKey();
-
+    strcpy(msg->mqkeys.recvkey,sendmq->Getkeys());  //client send pipe
+    msg->mqkeys.recvsem= sendmq->GetSemKey();
     msg->dump("open rbd");
-    
-    r = pdcclient->msgmq.push(msg);
+
+    //if(!MULTIPIPE)
+    p_pipe = &pdcclient->msgmq;   // use public to send register info
+    r = p_pipe->push(msg);
     delete msg;
     if(r<  0 ){
         cerr<<" create remote rados failed"<<endl;
-        
         return -1;
     }
+    cerr<<"send over and wait for open pipes"<<endl;
+    //todo : send zero meg to active remote pipe.
     
+    pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
+    //p_pipe = pdcclient->sendmq;    // multi model use private pipe
+    if(MULTIPIPE){ // multi model use private pipe to send ,
+        p_pipe = pdcclient->sendmq;
+        r = p_pipe->openpipe();   //WAIT for remote open, here is blocked
+        if(r < 0) cerr<<"multipipe open client send failed"<<endl;
+    }else{
+        p_pipe = pdcclient->ackmq;
+        r = p_pipe->openpipe();   //WAIT for remote open, here is blocked
+        if(r < 0) cerr<<"simple pipe open client recv failed"<<endl;
     }
-    sleep(1);
+
+
+    }
+    //sleep(1);
     cerr<<"pdc create rbd over"<<endl;
     return 0;
 

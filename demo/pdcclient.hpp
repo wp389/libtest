@@ -36,7 +36,9 @@ class PdcClient :public Center{
 public:
     map<int  , ThreadType >theads;
     //PdcPipe<PdcOp> pdc
+    
     PdcPipe<Msginfo> msgmq;
+    PdcPipe<Msginfo>::ptr sendmq;
     PdcPipe<Msginfo>::ptr ackmq;
     //map<map<string, string>, PdcPipe<Msginfo>* > ackmq;
     //list<PdcOp> queue_io;
@@ -99,6 +101,7 @@ public:
         perf(),time(),clientname(nm),pid(-1),threadnum(2),
         //autokey(250),  //pipe key start from 250
         msgmq(PIPEKEY, MEMQSEM, PIPEWRITE, PIPECLIENT),
+        sendmq(NULL),
         ackmq(NULL),
         performace(NULL),
         iothread(NULL), msgthread(NULL), listen(NULL),
