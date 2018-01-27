@@ -65,12 +65,14 @@ void* PdcClient::Iothreads::_process()
             r = p_pipe->push(msg);
             if(r< 0){
                 cerr<<"push op aio write:"<<msg->opid<<" failed"<<endl;
-                delete msg;
+                //delete msg;
+                pdc->obj_pool.free(msg);
                 continue;
             }
         }
         
-        delete msg;
+        //delete msg;
+        pdc->obj_pool.free(msg);
     }//while()
 		
     }//while(1)
@@ -84,6 +86,7 @@ void* PdcClient::Finisherthreads::_process()
     Msginfo *msg;
     Msginfo * op;
     u64 s = 0;
+	int r;
     pdcPipe::PdcPipe<Msginfo>* p_pipe;
     cerr<<"listen thread  start"<<endl;
     
@@ -94,14 +97,14 @@ void* PdcClient::Finisherthreads::_process()
             continue;
         }
 	 //cerr<<"to start open"<<endl;
-        op = p_pipe->pop();
-        if(op){
-            msg = new Msginfo();
-            msg->copy(op);
-            p_pipe->clear();
-        }else{
-            continue;
+		msg = pdc->obj_pool.malloc();
+	 	assert(msg != NULL);
+        r = p_pipe->pop(msg);
+        if(0 != r){
+			pdc->obj_pool.free(msg);
+			continue;
         }
+	 	msg->init_after_read();
 
         if(msg){
             msg->dump("client finish tp op");
@@ -250,7 +253,8 @@ void* PdcClient::Msgthreads::_process()
                 break;
 				
         }
-        delete msg;
+        //delete msg;
+        pdc->obj_pool.free(msg);
         p_pipe->clear();
   
         }

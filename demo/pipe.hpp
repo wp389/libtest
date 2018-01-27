@@ -235,23 +235,27 @@ public:
                         return r;
 			}
 
-			T* pop() {
-                        int r = 0;
-                        //cerr<<"pipe to pop:"<<m_key<<endl;
-                        //semLockGuard oLock(m_Sem);
-                        if(openpipe() < 0 ) return NULL;
-                        if (isEmpty()) {
-                            return NULL;//应该选择抛出异常等方式，待改进；
-                        }
-                        //T *t = new T();
+			int pop(T* t) {
+                int r = 0;
+                //cerr<<"pipe to pop:"<<m_key<<endl;
+                //semLockGuard oLock(m_Sem);
+                if (!t) {
+					return -1;
+                }
+                if(openpipe() < 0 ) return -1;
+                if (isEmpty()) {
+                    return -1;//应该选择抛出异常等方式，待改进；
+                }
+                //T *t = new T();
 			    while(r  <= 0)		
-                        r = ::read(fd, t ,sizeof(T));  //block
-                        
-                        if(r == sizeof(T)){
-                            return t;
-                        }
-                        else
-                            return NULL;
+                    r = ::read(fd, t ,sizeof(T));  //block
+                    
+                    if(r == sizeof(T)){
+                        return 0;
+                    }
+                    else {
+                        return -1;
+                    }
 			}
 			
                     void clear() { memset(t,0,sizeof(T));}

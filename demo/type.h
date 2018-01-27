@@ -267,6 +267,22 @@ struct  Msginfo{
     void *slab;
 	
     Msginfo():sw(false),opid(0),remote_pid(0),return_code(0),ref(0) {pid = getpid(); };
+	/*init some member,just like the default construction function*/
+	void default_init() {
+		sw = false;
+		opid = 0;
+		remote_pid = 0;
+		return_code = 0;
+		ref = 0;
+		pid = getpid();
+	}
+	/*init some member after reading pipe*/
+	void init_after_read() {
+		sw = false;
+		ref = 0;
+		remote_pid = pid;
+		pid = getpid();
+	}
     void getopid() {opid = ++msgid;}
     void ref_inc() {ref++;}
     void ref_dec() {ref--;}

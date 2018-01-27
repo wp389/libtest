@@ -11,6 +11,7 @@
 #include "pipe.hpp"
 #include "type.h"
 #include "pdc_lock.hpp"
+#include "mempool.hpp"
 
 using namespace std;
 //using namespace wp::Pipe;
@@ -82,6 +83,7 @@ public:
     PdcLock msglock;
     list<Msginfo *>msgop;
     Msgthreads *msgthread;
+	MemPool<Msginfo> obj_pool;
     
     
 public:

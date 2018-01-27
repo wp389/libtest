@@ -9,6 +9,7 @@
 #include "shmmem.hpp"
 #include "pipe.hpp"
 #include "type.h"
+#include "mempool.hpp"
 
 
 using namespace std;
@@ -44,6 +45,7 @@ public:
     Perfs *performace;
     ShmMem<simpledata> slab;
     map<string,BackendClient *> clusters;
+	MemPool<Msginfo> obj_pool;
 	
 public:
     class Iothreads :public Threadpool{
