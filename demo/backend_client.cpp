@@ -42,13 +42,13 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, 
     BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)this;
     //PdcCompletion *comp = (PdcCompletion*)c;
 	
-    PdcClient *pdc = pdc_client_mgr;
+    //PdcClient *pdc = pdc_client_mgr;
     
     //PdcOp *op= new PdcOp();
     //Msginfo *msg = prbd->mq[RECVMQ].pop();
    // Msginfo *msg = new Msginfo();
 	
-	Msginfo *msg  = pdc->obj_pool.malloc();
+	Msginfo *msg  = prbd->rados->ceph->msg_pool->malloc();
 	msg->default_init();
     //msg->getopid();
     msg->opcode = PDC_AIO_WRITE;
@@ -86,8 +86,9 @@ void* BackendClient::findclient(map<string, string> *opclient)
     }
     return NULL;
 }
-BackendClient::BackendClient(string nm,string _conf, list<Msginfo *>*msgop,pthread_mutex_t *mutex):
-    name(nm),_confpath(_conf),_queue(msgop),_mutex(mutex)
+BackendClient::BackendClient(string nm,string _conf, list<Msginfo *>*msgop,
+			pthread_mutex_t *mutex, MemPool<Msginfo> *_msg_pool):
+    name(nm),_confpath(_conf),_queue(msgop),_mutex(mutex), msg_pool(_msg_pool)
 {
 
 }

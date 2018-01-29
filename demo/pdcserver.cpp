@@ -52,7 +52,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
         
     }
     //delete op;
-	pdc->obj_pool.free(op);
+	pdc->msg_pool.free(op);
     if(cb)
         rbd_aio_release(cb);
     
@@ -244,7 +244,7 @@ void* Pdcserver::Finisherthreads::_process()
             //if(MULTIPIPE)
             if(( tfd == listenfd )&& (events[n].events & EPOLLIN)){  //
                 //Msginfo *op = new Msginfo();
-                Msginfo *op = pdc->obj_pool.malloc();
+                Msginfo *op = pdc->msg_pool.malloc();
 				op->default_init();
                 r = ::read(tfd, op, bufsize);
                 if(r == bufsize){
@@ -349,7 +349,7 @@ void* Pdcserver::Msgthreads::_process()
          }
         }
         //delete msg;
-	    pdc->obj_pool.free(msg);
+	    pdc->msg_pool.free(msg);
        }
 
        //pdc->msglock.lock();

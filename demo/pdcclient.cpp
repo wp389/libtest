@@ -66,13 +66,13 @@ void* PdcClient::Iothreads::_process()
             if(r< 0){
                 cerr<<"push op aio write:"<<msg->opid<<" failed"<<endl;
                 //delete msg;
-                pdc->obj_pool.free(msg);
+                pdc->msg_pool.free(msg);
                 continue;
             }
         }
         
         //delete msg;
-        pdc->obj_pool.free(msg);
+        pdc->msg_pool.free(msg);
     }//while()
 		
     }//while(1)
@@ -97,11 +97,11 @@ void* PdcClient::Finisherthreads::_process()
             continue;
         }
 	 //cerr<<"to start open"<<endl;
-		msg = pdc->obj_pool.malloc();
+		msg = pdc->msg_pool.malloc();
 	 	assert(msg != NULL);
         r = p_pipe->pop(msg);
         if(0 != r){
-			pdc->obj_pool.free(msg);
+			pdc->msg_pool.free(msg);
 			continue;
         }
 	 	msg->init_after_read();
@@ -254,7 +254,7 @@ void* PdcClient::Msgthreads::_process()
 				
         }
         //delete msg;
-        pdc->obj_pool.free(msg);
+        pdc->msg_pool.free(msg);
         p_pipe->clear();
   
         }
@@ -275,7 +275,8 @@ int PdcClient::init()
     string state("init: ");
     cerr<<state<<"start thread:"<<endl;
 
-    BackendClient* pceph = new BackendClient("ceph","/etc/ceph/ceph.conf", &msgop, &msglock._mutex);
+    BackendClient* pceph = new BackendClient("ceph","/etc/ceph/ceph.conf", 
+						&msgop, &msglock._mutex, &msg_pool);
     clusters["ceph"] = pceph;
     //slab = new wp::shmMem::shmMem(MEMKEY, SERVERCREATE);
     ret = slab.Init();

@@ -45,7 +45,7 @@ public:
     Perfs *performace;
     ShmMem<simpledata> slab;
     map<string,BackendClient *> clusters;
-	MemPool<Msginfo> obj_pool;
+	MemPool<Msginfo> msg_pool;
 	
 public:
     class Iothreads :public Threadpool{
