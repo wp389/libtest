@@ -12,3 +12,9 @@ fio with blockhole is 160k iops.
 multiclient can run to 200k iops with 1ms latency
 increase some multipipe function but not enabled
 
+2018:1-29
+multclient can run to 240k iops + 1.3ms~ 1.5ms latency \    
+in blackhole,with multipipe model    
+
+
+

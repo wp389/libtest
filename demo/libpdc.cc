@@ -188,8 +188,11 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
     strcpy(msg->client.cluster,"ceph");
     strcpy(msg->client.pool, prados->GetName());
     strcpy(msg->client.volume,rbd_name);
+    // init client recvmq : server sendmq
     strcpy(msg->mqkeys.key,recvmq->Getkeys());  //client recv pipe
     msg->mqkeys.semkey = recvmq->GetSemKey();
+
+    //init client sendmq : server recvmq
     strcpy(msg->mqkeys.recvkey,sendmq->Getkeys());  //client send pipe
     msg->mqkeys.recvsem= sendmq->GetSemKey();
     msg->dump("open rbd");
@@ -212,12 +215,23 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
         r = p_pipe->openpipe();   //WAIT for remote open, here is blocked
         if(r < 0) cerr<<"multipipe open client send failed"<<endl;
     }else{
+        /*
         p_pipe = pdcclient->ackmq;
         r = p_pipe->openpipe();   //WAIT for remote open, here is blocked
         if(r < 0) cerr<<"simple pipe open client recv failed"<<endl;
+        */
     }
-
-
+    if(MULTIPIPE){
+        Msginfo *msg = new Msginfo();
+        msg->opcode = PDC_ADD_EPOLL;
+    
+        strcpy(msg->client.cluster,"ceph");
+        strcpy(msg->client.pool, prados->GetName());
+        strcpy(msg->client.volume,rbd_name);
+        p_pipe = &pdcclient->msgmq;   // use public to send register info
+        r = p_pipe->push(msg);
+        delete msg;
+    }
     }
     //sleep(1);
     cerr<<"pdc create rbd over"<<endl;

@@ -46,8 +46,8 @@ int createpublicqueues(map<string ,void *> &mqs,bool sw)
 }
 int createclientqueues(map<string ,void *> &mqs,bool sw)
 {
-    stringstream newkey;
-    string pkey;
+    stringstream newkey, newsendkey;
+    string pkey, pskey;
     int skey;
     int r;
     pid_t pid= getpid();
@@ -63,15 +63,16 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
     if(r < 0){
         cerr<<"create recvmq failed:"<<r<<endl;
     }
-
+    
     if(MULTIPIPE){
-        newkey<<"/tmp/"<<pid<<GetMqKey();
-        newkey >>pkey;
-        skey = GetMqKey() +pid;
         
+        newsendkey<<"/tmp/"<<pid<<GetMqKey();
+        newsendkey >>pskey;
+        skey = GetMqKey() +pid;
+        cerr<<"create client send queue:"<<pskey<<" semkey:"<<skey<<" sw is:"<<sw<<endl;
         //pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPEKEY,PIPESEMKEY,PIPEWRITE ,PIPECLIENT);
         pdcPipe::PdcPipe<Msginfo>::ptr sendmq = new pdcPipe::PdcPipe<Msginfo>(PIPECLIENT);
-        sendmq->ResetPipeKey(pkey);
+        sendmq->ResetPipeKey(pskey);
         sendmq->ResetSemKey(skey);
         r = sendmq->Init();
         if(r < 0){

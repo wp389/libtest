@@ -55,6 +55,7 @@ extern u64 opid;
 #define MULTIPIPE 0
 #define CHUNKSIZE 4096
 #define EPOLLSIZE 1024
+
 using namespace std;
 //using namespace wp::Pipe;
 //using namespace pdcPipe::PdcPipe;
@@ -175,12 +176,12 @@ public:
 typedef enum {
     OPEN_RADOS = 0xa,	//10
     OPEN_RBD,			//11
-    PDC_AIO_STAT,
-    PDC_ADD_EPOLL,
-    PDC_AIO_WRITE,		//12
-    PDC_AIO_READ,		//13
-    GET_MEMORY,			//14
-    ACK_MEMORY,			//15
+    PDC_AIO_STAT,		//12
+    PDC_ADD_EPOLL,		//13
+    PDC_AIO_WRITE,		//14
+    PDC_AIO_READ,		//15
+    GET_MEMORY,			//16
+    ACK_MEMORY,			//17
     RW_OP,
     MGR_OP,
     RW_FINISH,
