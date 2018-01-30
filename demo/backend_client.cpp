@@ -4,6 +4,7 @@
 #include "type.h"
 #include "backend_client.hpp"
 #include "pipe.hpp"
+#include "pdcclient.hpp"
 
 
 BackendClient::RadosClient::RadosClient(string nm, string _conf, BackendClient *_ceph):
@@ -45,7 +46,10 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, 
     
     //PdcOp *op= new PdcOp();
     //Msginfo *msg = prbd->mq[RECVMQ].pop();
-    Msginfo *msg = new Msginfo();
+   // Msginfo *msg = new Msginfo();
+	
+	Msginfo *msg  = prbd->rados->ceph->msg_pool->malloc();
+	msg->default_init();
     //msg->getopid();
     msg->opcode = PDC_AIO_WRITE;
     strcpy(msg->client.pool, prbd->rados->GetName());
@@ -82,8 +86,9 @@ void* BackendClient::findclient(map<string, string> *opclient)
     }
     return NULL;
 }
-BackendClient::BackendClient(string nm,string _conf, list<Msginfo *>*msgop,pthread_mutex_t *mutex):
-    name(nm),_confpath(_conf),_queue(msgop),_mutex(mutex)
+BackendClient::BackendClient(string nm,string _conf, list<Msginfo *>*msgop,
+			pthread_mutex_t *mutex, MemPool<Msginfo> *_msg_pool):
+    name(nm),_confpath(_conf),_queue(msgop),_mutex(mutex), msg_pool(_msg_pool)
 {
 
 }

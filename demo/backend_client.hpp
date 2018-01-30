@@ -6,6 +6,7 @@
 
 #include "completion.hpp"
 #include "pdc_lock.hpp"
+#include "mempool.hpp"
 
 
 using namespace std;
@@ -18,6 +19,7 @@ public:
     void *sendmq;
     list<Msginfo *> *_queue;
     pthread_mutex_t *_mutex;
+	MemPool<Msginfo> *msg_pool;
 public:
     class RadosClient{
         string radosname;
@@ -60,7 +62,8 @@ public:
 
 
 public:
-    BackendClient(string nm, string confpath, list<Msginfo *>* msgop, pthread_mutex_t *mutex);
+    BackendClient(string nm, string confpath, list<Msginfo *>* msgop,
+			pthread_mutex_t *mutex, MemPool<Msginfo> *_msg_pool);
     ~BackendClient() {}
 
     void *findclient(map<string, string> *opclient);

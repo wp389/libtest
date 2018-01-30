@@ -51,7 +51,8 @@ void pdc_callback(rbd_completion_t cb, void *arg)
         //TO DELETE OP
         
     }
-    delete op;
+    //delete op;
+	pdc->msg_pool.free(op);
     if(cb)
         rbd_aio_release(cb);
     
@@ -255,30 +256,38 @@ void* Pdcserver::Finisherthreads::_process()
             * we need to check if need to add new fd to epoll
             */
             //if(MULTIPIPE)
-            Msginfo *op = new Msginfo();
-            r = ::read(tfd, op, bufsize);
-            
+            //Msginfo *op = new Msginfo();
+            //r = ::read(tfd, op, bufsize);
+			
+			Msginfo *op = pdc->msg_pool.malloc();
+			r = ::read(tfd, op, bufsize);
+			
             if(( tfd == listenfd )&& (events[n].events & EPOLLIN)){  //
                 if(op->opcode == PDC_ADD_EPOLL){ // MULTI model to add epoll listen
-                    op->("pdc add epoll");
+                    op->dump("pdc add epoll");
                     if(MULTIPIPE)
                        add_event(pdc, epfd, ev, op, 0);
-                       curfds++;
+                    curfds++;
                        //ev.data.fd = ;
-                    delete op;
+                    //delete op;
+                    pdc->msg_pool.free(op);
                 }else{
                   if(r == bufsize){
+					   op->init_after_read();
                        r = handle_listen_events(server,op);
                   }else{
                        cerr<<"pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+					   pdc->msg_pool.free(op);
                   }
                 }
             }else{
                 if(r == bufsize){
+					op->init_after_read();
                     r = handle_listen_events(server,op);
                 }else{
                         // need  delete ?
                         cerr<<"pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+						pdc->msg_pool.free(op);
                 }
                 //cerr<<" fds:"<<fds <<" now is:"<<n<<" fd :"<<tfd<<endl;
             }
@@ -377,7 +386,8 @@ void* Pdcserver::Msgthreads::_process()
 
          }
         }
-        delete msg;
+        //delete msg;
+	    pdc->msg_pool.free(msg);
        }
 
        //pdc->msglock.lock();
