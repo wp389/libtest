@@ -245,9 +245,10 @@ void* Pdcserver::Finisherthreads::_process()
             if(( tfd == listenfd )&& (events[n].events & EPOLLIN)){  //
                 //Msginfo *op = new Msginfo();
                 Msginfo *op = pdc->msg_pool.malloc();
-				op->default_init();
+				//op->default_init();
                 r = ::read(tfd, op, bufsize);
                 if(r == bufsize){
+					op->init_after_read();
                     r = handle_listen_events(server,op);
                     
                 }else{
