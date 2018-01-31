@@ -140,8 +140,8 @@ extern "C" void rados_shutdown(rados_t cluster)
 extern "C" ssize_t rbd_aio_get_return_value(rbd_completion_t c)
 //ssize_t pdc_rbd_aio_get_return_value(rbd_completion_t c)
 {
-    PdcAioCompletion *comp = (PdcAioCompletion*)c;
-    return comp->aio_get_return_value(); 
+    PdcCompletion *comp = (PdcCompletion *)c;
+    return comp->get_return_value(); 
 }
 
 extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *image,
@@ -252,14 +252,14 @@ extern "C" int rbd_aio_create_completion(void *cb_arg,
 					 rbd_completion_t *c)
 //int pdc_create_aio_complation(void *cb_arg, pdc_callback_t  cb,pdc_rbd_completion_t *c)
 {
-    PdcAioCompletion *comp = new PdcAioCompletion(cb, cb_arg);
+    PdcCompletion *comp = new PdcCompletion(cb, cb_arg);
     *c = (rbd_completion_t )comp;
     return 0;;
 }
 
-PdcCompletion* get_aio_completion(PdcAioCompletion* comp) {
-  return comp->pc;
-}
+/*PdcCompletion *get_aio_completion(PdcAioCompletion* comp) {
+  return this;
+}*/
 
 extern "C" int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
 			     const char *buf, rbd_completion_t c)
@@ -268,10 +268,10 @@ extern "C" int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
                          //const char *buf ,pdc_rbd_completion_t c)
 {
     int r;
-    PdcAioCompletion *comp = (PdcAioCompletion*)c;
-    BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)image;
+    PdcCompletion *comp = (PdcCompletion *)c;
+    BackendClient::RbdVolume *prbd = (BackendClient::RbdVolume *)image;
 
-    r = prbd->aio_write(off,  len, buf, get_aio_completion( comp));
+    r = prbd->aio_write(off, len, buf, comp);
     
     return 0;
 }
@@ -301,9 +301,8 @@ extern "C" int rbd_aio_flush(rbd_image_t image, rbd_completion_t c)
 extern "C" void rbd_aio_release(rbd_completion_t c)
 //void pdc_aio_release(pdc_rbd_completion_t c)
 {
-    PdcAioCompletion *comp = (PdcAioCompletion*)c;
+    PdcCompletion *comp = (PdcCompletion *)c;
     comp->release();
-
 }
 
 /*
@@ -333,7 +332,7 @@ extern "C" int rbd_stat(rbd_image_t image, rbd_image_info_t *info,
 extern "C" int rbd_aio_wait_for_complete(rbd_completion_t c)
 //extern "C" int pdc_rbd_aio_wait_for_complete(pdc_rbd_completion_t c)
 {
-    PdcAioCompletion *comp = (PdcAioCompletion*)c;
+    PdcCompletion *comp = (PdcCompletion *)c;
 
     comp->wait_for_complete();
     return 0;

@@ -15,8 +15,8 @@ typedef void (*pdc_callback_t)(pdc_rbd_completion_t c, void *arg);
 
 //(librbd::RBD::AioCompletion *)
 
-struct PdcCompletion{
-    void * comp;  //(librbd::RBD::AioCompletion *)
+struct PdcCompletion {
+    //void * comp;  //(librbd::RBD::AioCompletion *)
     PdcLock lock;
     PdcCond cond;
     void *read_buf;
@@ -54,17 +54,23 @@ public:
         retcode = r;    
         //cerr<<"client get rbd return value :"<< retcode <<endl;
         if(callback)
-            callback(comp,callback_arg);
+            callback(this, callback_arg);
         done = true;
         cond.Signal();
 
         return 0;
     }
-    int wait_for_complete()
-    {
-        
+	
+    void add_request() {
         lock.lock();
         ref++;
+        lock.unlock();
+    }
+	
+    int wait_for_complete()
+    {
+        lock.lock();
+        //ref++;
         while (!done)
            cond.wait(lock);
         lock.unlock();
@@ -73,17 +79,21 @@ public:
         return 0;
     }
     void release(){
+        assert(ref > 0);
+        lock.lock();
+        int n = --ref;
+        lock.unlock();
+        if (!n) {
+            delete this;
+        }
         //lock;
         //NEED todo?
         //unlock;
-        ref--;
-        //if(ref == 0)
-        //    delete this;
     }
 };
 
 
-
+#if 0
 struct PdcAioCompletion{
     PdcCompletion *pc; //PdcCompletion*
     
@@ -116,5 +126,6 @@ public:
 		
     }
 };
+#endif
 
 #endif
