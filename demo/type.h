@@ -50,9 +50,9 @@ extern u64 opid;
 #define SERVERCREATE 1
 #define CLIENTNOCREATE 0
 
-#define SERVER_IO_BLACKHOLE 0
+#define SERVER_IO_BLACKHOLE 1
 
-#define MULTIPIPE 0
+#define MULTIPIPE 1
 #define CHUNKSIZE 4096
 #define EPOLLSIZE 1024
 
@@ -185,9 +185,9 @@ typedef enum {
     RW_OP,
     MGR_OP,
     RW_FINISH,
-    RW_W_FINISH,		//19
-    RW_R_FINISH,
-    
+    RW_W_FINISH,		//21
+    RW_R_FINISH,			//22
+    PUT_SHM,
 
 }PdcIomachine;
 

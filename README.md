@@ -16,5 +16,9 @@ increase some multipipe function but not enabled
 multclient can run to 240k iops + 1.3ms~ 1.5ms latency \    
 in blackhole,with multipipe model    
 
+2018:1-30
+msg mempool is ok
+aio read is ok,
+blockhole is 240-250k iops to randread.
 
 

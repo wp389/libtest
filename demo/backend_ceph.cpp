@@ -113,6 +113,19 @@ int CephBackend::RbdVolume::do_aio_write(void *_op,u64 offset, size_t len,const 
 
 return r;
 }
+int CephBackend::RbdVolume::do_aio_read(void *_op,u64 offset, size_t len, char *buf, pdc_rbd_completion_t c)
+{
+    int r;
+    Msginfo* op= (Msginfo *)_op;
+    rbd_completion_t comp;
+    if(!image)  return -1;
+    op->ref_inc();
+    //do_create_rbd_completion(op ,&comp);
+    r = rbd_aio_read(image, offset, len, buf, c);
+
+return r;
+}
+
 
 int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
 {

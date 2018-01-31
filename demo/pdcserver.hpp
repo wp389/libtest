@@ -105,13 +105,14 @@ public:
     int register_vm(map<string,string > &client, Msginfo *msg);
     int unregister();
     int register_connection(Msginfo* msg);
-    int release_shmkey(vector<u64> & indexlist )
+    int release_shmkey(Msginfo *op )
     {
-        int r;
-		
+        int n;
+        vector<u64> mems(op->data.indexlist,op->data.indexlist+ op->data.chunksize);
+        n = slab.put(mems);
         //r = slab.put(indexlist);
-        cerr<<"free usedlist :"<<r<<endl;
-        return r;
+        //cerr<<"free usedlist :"<<r<<endl;
+        return n;
     }
     Msginfo* register_put(Msginfo *op);
 

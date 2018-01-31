@@ -66,8 +66,7 @@ void* PdcClient::Iothreads::_process()
             if(r< 0){
                 cerr<<"push op aio write:"<<msg->opid<<" failed"<<endl;
                 //delete msg;
-                pdc->msg_pool.free(msg);
-                continue;
+                //continue;
             }
         }
         
@@ -101,6 +100,7 @@ void* PdcClient::Finisherthreads::_process()
 	 	assert(msg != NULL);
         r = p_pipe->pop(msg);
         if(0 != r){
+		    cerr<<"pop size is:"<<r<<endl;
 			pdc->msg_pool.free(msg);
 			continue;
         }
@@ -108,61 +108,33 @@ void* PdcClient::Finisherthreads::_process()
 
         if(msg){
             msg->dump("client finish tp op");
-            if(msg->opcode == ACK_MEMORY){
+            switch(msg->opcode){
+            case ACK_MEMORY:
                 msg->opcode = PDC_AIO_WRITE;
-                //p_pipe->clear();
-                
-                msg->dump("get memory ack, todo RW");
-                //pdc->OpFindClient(msg);
                 pdc->iolock.lock();
                 pdc->ops.push_back(msg);
                 //pdc->opcond.Signal();
                 pdc->iolock.unlock();
-                
-            }
-            if(msg->opcode == RW_W_FINISH){
+                break;
+            case RW_W_FINISH:
                 pdc->msglock.lock();
                 pdc->msgop.push_back(msg);
                 //pdc->msgcond.Signal();
                 pdc->msglock.unlock();
-                
-            }
-             
-            /*
-            if(msg->opcode == RW_W_FINISH){
-                cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
-                PdcCompletion *c = reinterpret_cast<PdcCompletion*>(msg->data.c);
-                if(c && c->callback){
-                    ///c->callback(c->comp, c->callback_arg);
-                    c->complete(msg->return_code);
-                    //todo put shmmemory keys .  
-                    vector<u64> index(op->data.indexlist,op->data.indexlist+sizeof(op->data.indexlist)/sizeof(u64));
-                    pdc->release_shmkey(index);
-
-                }
-                delete msg;
-            }
-            */
-
-	 }
-        //free shared memory
-        
-        //TODO: here ,we connect rados  and write rbd
-
-        /*
-        if(0){
-            pthread_mutex_lock(&pdc->finimutex);
-            if(pdc->finishop.empty()){
-                pthread_mutex_unlock(&pdc->finimutex);
-                continue;
-            }
-            msg = pdc->finishop.front();
-            pdc->finishop.pop_front();
-            pthread_mutex_unlock(&pdc->finimutex);
+                break;
+            case RW_R_FINISH:
+                pdc->msglock.lock();
+                pdc->msgop.push_back(msg);
+                //pdc->msgcond.Signal();
+                pdc->msglock.unlock();
+                break;
+             default:
+                assert(0);
+                break;
         }
-        */
     }
 
+}
 return NULL;
 
 }
@@ -204,8 +176,8 @@ void* PdcClient::Msgthreads::_process()
             //assert(msg->client.cluster == "ceph");
             client[msg->client.pool] = msg->client.volume;
             //perf.inc();
-            prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->volume); 
-
+            prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume()); 
+            
             switch(msg->opcode){
             case OPEN_RADOS:
                 cerr<<"do not come here rados"<<msg->opid<<endl;
@@ -214,7 +186,7 @@ void* PdcClient::Msgthreads::_process()
                  cerr<<"do not come here rbd"<<msg->opid<<endl;
                  break;
             case PDC_AIO_WRITE:
-            assert(prbd);
+                assert(prbd);
                 msg->opcode =GET_MEMORY;
                 //list<u64> listadd ;
                 //TODO:SET START TIME
@@ -226,20 +198,28 @@ void* PdcClient::Msgthreads::_process()
                 if(r< 0){
                     cerr<<"=============get memory failed"<<endl;
                     msg->dump(" msg push failed" );
-                    //delete msg;
-                    //break;
                 }
                 break;
-                //delete msg;
+
                 //TODO:SET END TIME
             case PDC_AIO_READ:
-
+                //TODO:SET START TIME
+                msg->getopid();
+                assert(prbd);
+                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
+                assert(p_pipe);
+                r = p_pipe->push(msg);
+                if(r< 0){
+                    cerr<<"=============get memory failed"<<endl;
+                    msg->dump(" msg push failed" );
+                }
                 break;
             case ACK_MEMORY:
             //send msg and wait for ack:
                 assert(0);
                 break;
             case RW_W_FINISH:
+                //assert(prbd);
                 //cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
                 c = reinterpret_cast<PdcCompletion*>(msg->data.c);
                 if(c && c->callback){
@@ -248,6 +228,31 @@ void* PdcClient::Msgthreads::_process()
                     c->release();
                 }
                 break;
+             case RW_R_FINISH:
+                //cerr<<"read op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
+                c = reinterpret_cast<PdcCompletion*>(msg->data.c);
+                if(c && c->callback){
+                    ///c->callback(c->comp, c->callback_arg);
+                    c->complete(msg->return_code);
+                    c->release();
+                }
+                // whether send cmd to server to put sharedmemory
+                msg->opcode = PUT_SHM;
+                
+                msg->getopid();
+                
+                //cerr<<"start to get memory"<<endl;
+                pdc->OpFindClient( msg);
+                prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume());
+                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
+                assert(p_pipe);
+                r = p_pipe->push(msg);
+                if(r< 0){
+                    cerr<<"=============send put memory failed"<<endl;
+                    msg->dump(" msg push failed" );
+                }
+                break;
+            
             default:
                 cerr<<"other code? "<<msg->opcode<<endl;
                 break;
@@ -255,7 +260,7 @@ void* PdcClient::Msgthreads::_process()
         }
         //delete msg;
         pdc->msg_pool.free(msg);
-        p_pipe->clear();
+        //p_pipe->clear();
   
         }
     }

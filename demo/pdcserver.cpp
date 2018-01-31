@@ -14,6 +14,11 @@ void pdc_callback(rbd_completion_t cb, void *arg)
 {
     int r;
     int n;
+    u32 bufsize = 0;
+    u32 lengh = 0;
+    u32 pos = 0;
+    char *buf;
+
     Pdcserver * pdc = pdc_server_mgr;
     Msginfo *op = (Msginfo*)arg;
     //shmMem::ShmMem<simpledata> *shm = reinterpret_cast<shmMem::ShmMem<simpledata> *>(op->slab);
@@ -28,7 +33,8 @@ void pdc_callback(rbd_completion_t cb, void *arg)
         CephBackend::RbdVolume *prbd = (CephBackend::RbdVolume *)op->volume;
         
         if(! prbd) assert(0);
-        if(op->opcode == PDC_AIO_WRITE) {
+        switch(op->opcode){
+        case PDC_AIO_WRITE:
             op->opcode =  RW_W_FINISH;
             //todo put shmmemory keys .  
             
@@ -38,10 +44,50 @@ void pdc_callback(rbd_completion_t cb, void *arg)
                 if(n < 0 ){
                     cerr<<"shm->put falied:"<<n <<" and index is:"<<index.size()<<endl;
                     //return ;
-                    
                 }
             }
-            
+            break;
+
+        case PDC_AIO_READ:
+            op->opcode =  RW_R_FINISH;
+            buf = (char *)op->op;
+            assert(buf);
+            if(pdc){
+                 // copy buffer
+                 
+                //vector<u64> index(op->data.indexlist,op->data.indexlist+op->data.chunksize);
+                n = pdc->slab.get(op->data.len, op->data.indexlist);
+                if(n < 0 ){
+                    cerr<<"callback slab->get failed:"<< n <<" and index is:"<<op->data.chunksize<<endl;
+                    //return ;
+                    break;
+                }
+                op->data.chunksize = n;
+                bufsize = op->data.len;
+                lengh = 0;
+                pos = 0;
+                
+                for(int i = 0;i < op->data.chunksize;i++){
+                //memset(op->data.pdata, 6, op->data.len);
+                simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
+                //TODO: WRITE
+                lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
+                ::memcpy((char *)pdata, buf+ pos,  lengh);
+                bufsize -= lengh;
+                pos += lengh;
+                }
+
+            }
+            if(buf){
+                ::free(buf);
+                op->op = NULL;
+                buf = NULL;
+            }
+            break;
+        default:
+            op->dump("callback error code ");
+            break;
+
         }
         pdcPipe::PdcPipe<Msginfo>*p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
         r = p_pipe->push(op);
@@ -77,6 +123,10 @@ void* Pdcserver::Iothreads::_process()
 {
     int r = 0;
     u64 sum =0;
+    u64 off = 0;
+    u32 bufsize = 0;
+    u32 lengh;
+    char *buf;
     static bool flag = false;
     Pdcserver *pdc = (Pdcserver *)server;
     CephBackend::RbdVolume *vol;
@@ -105,14 +155,21 @@ void* Pdcserver::Iothreads::_process()
             continue;
         }
         sum++;
-        switch(op->opcode){
-        case PDC_AIO_WRITE:
-        if(!SERVER_IO_BLACKHOLE){    //black hole
+        if(SERVER_IO_BLACKHOLE){   //black hole
+            if(!flag){
+                flag = true;
+                cerr<<"********server start to use black hole*******"<<endl;
+            }
+        }
         rbd_completion_t comp;
-        u64 off = op->data.offset;
-        u32 bufsize = op->data.len;
-        u32 lengh;
-
+        switch(op->opcode){
+        // aio write
+        case PDC_AIO_WRITE:
+        if(!SERVER_IO_BLACKHOLE){
+        //rbd_completion_t comp;
+        off = op->data.offset;
+        bufsize = op->data.len;
+        lengh;
         flag = false;
         vol->do_create_rbd_completion(op, &comp);
         for(int i = 0;i < op->data.chunksize;i++){
@@ -121,22 +178,38 @@ void* Pdcserver::Iothreads::_process()
             //TODO: WRITE
             lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
             vol->do_aio_write(op, off+ i*CHUNKSIZE, lengh, (char *)pdata, comp);   
+            bufsize -= lengh;
         }
-        //cerr<<"do rbd write---------:"<<sum<<endl;
+        }else {
+            op->ref_inc();
+            pdc_callback(NULL, op);
+            //continue;
+        }
+        break;
+        // aio read
+        case PDC_AIO_READ:
+            //rbd_completion_t comp;
+            
+            off = op->data.offset;
+            bufsize = op->data.len;
+            lengh = 0;
+            //buf = NULL;
+            buf = (char *)malloc(op->data.len);
+            op->op = (void *)buf;
+        if(!SERVER_IO_BLACKHOLE){
+            flag = false;
+            vol->do_create_rbd_completion(op, &comp);
+            vol->do_aio_read(op,  op->data.offset, op->data.len, buf, comp);   
         }else{
-            if(!flag){
-                flag = true;
-                cerr<<"********server start to use black hole*******"<<endl;
-            }
             op->ref_inc();
             pdc_callback(NULL, op);
 
         }
-        break;
+            break;		
         default:
             assert(0);
             break;
-    }
+       }
     }
     }
     return 0;
@@ -152,6 +225,14 @@ int handle_listen_events(Pdcserver *pdc, Msginfo* op)
         switch(op->opcode){
         case PDC_AIO_WRITE:
             //op->opcode == PDC_AIO_WRITE;
+            pdc->iolock.lock();
+            pdc->ops.push_back(op);
+            //pdc->iocond.Signal();
+            pdc->iolock.unlock();
+            
+            break;
+        
+        case PDC_AIO_READ:
             pdc->iolock.lock();
             pdc->ops.push_back(op);
             //pdc->iocond.Signal();
@@ -255,13 +336,10 @@ void* Pdcserver::Finisherthreads::_process()
             * if every client use it's own fifo fd, then tfd == listenfd ,
             * we need to check if need to add new fd to epoll
             */
-            //if(MULTIPIPE)
             //Msginfo *op = new Msginfo();
-            //r = ::read(tfd, op, bufsize);
-			
 			Msginfo *op = pdc->msg_pool.malloc();
-			r = ::read(tfd, op, bufsize);
-			
+            r = ::read(tfd, op, bufsize);
+            
             if(( tfd == listenfd )&& (events[n].events & EPOLLIN)){  //
                 if(op->opcode == PDC_ADD_EPOLL){ // MULTI model to add epoll listen
                     op->dump("pdc add epoll");
@@ -306,6 +384,7 @@ return 0;
 void* Pdcserver::Msgthreads::_process()
 {
     int r;
+    int n;
     u64 sum = 0;
     CephBackend::RbdVolume *vol;
     pdcPipe::PdcPipe<Msginfo>::ptr pipe;
@@ -344,7 +423,8 @@ void* Pdcserver::Msgthreads::_process()
                 r = pdc->register_vm(client, msg);
                 if(r < 0){
                     cerr<<"register vm failed ret = "<<r <<endl;
-                    continue;
+                    //delete msg;
+                    //continue;
                 }
                 break;
             }
@@ -361,7 +441,8 @@ void* Pdcserver::Msgthreads::_process()
                 r = pdc->slab.get(msg->data.len, msg->data.indexlist);
                 if(r <= 0){
                     cerr<<"get memory failed"<<endl;
-                    continue;
+					//TODO : need more todo
+                    break;
                 }
                 msg->data.chunksize = r;
                 msg->opcode = ACK_MEMORY;
@@ -373,10 +454,17 @@ void* Pdcserver::Msgthreads::_process()
                 if(r < 0){
                     msg->dump("push failed");
                     cerr<<"pipe push msg:"<<msg->opid<<" failed"<<endl;
-                    continue;
+                    break;
                 }
                 break;
             }
+            case PUT_SHM:
+                n = pdc->release_shmkey(msg);
+                if(n < 0 ){
+                    cerr<<"shm->put falied:"<<n <<" and index is:"<<msg->data.chunksize<<endl;
+                }            
+			
+            break;
             default:
             {
                 cerr<<"opcode error:"<<msg->opcode<<endl;

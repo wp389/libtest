@@ -279,9 +279,15 @@ extern "C" int rbd_aio_read(rbd_image_t image, u64 off, size_t len,
 			    char *buf, rbd_completion_t c)
 {
 
-    cerr<<"rbd aio read is not imple"<<endl;
+    //cerr<<"rbd aio read is not imple"<<endl;
+    int r;
+    PdcAioCompletion *comp = (PdcAioCompletion*)c;
+    BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)image;
 
-    return  -1;
+    r = prbd->aio_read(off,  len, buf, get_aio_completion( comp));
+    
+
+    return  0;
 
 }
 

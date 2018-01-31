@@ -59,7 +59,8 @@ public:
         //static void pdc_callback(rbd_completion_t cb, void *arg);
         int do_create_rbd_completion(void * op, rbd_completion_t *comp );
         int do_aio_write(void *_op,u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c);
-
+        int do_aio_read(void *_op,u64 offset, size_t len, char *buf, pdc_rbd_completion_t c);
+  
     };
     map<string , RadosClient*> radoses;
     map<string , RbdVolume *>  vols;

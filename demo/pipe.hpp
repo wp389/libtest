@@ -253,14 +253,14 @@ public:
                     return -1;//应该选择抛出异常等方式，待改进；
                 }
                 //T *t = new T();
-			    while(r  <= 0)		
+			    //while(r  <= 0)		
                     r = ::read(fd, t ,sizeof(T));  //block
                     
                     if(r == sizeof(T)){
                         return 0;
                     }
                     else {
-                        return -1;
+                        return r;
                     }
 			}
 			

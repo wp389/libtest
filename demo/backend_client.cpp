@@ -4,7 +4,6 @@
 #include "type.h"
 #include "backend_client.hpp"
 #include "pipe.hpp"
-#include "pdcclient.hpp"
 
 
 BackendClient::RadosClient::RadosClient(string nm, string _conf, BackendClient *_ceph):
@@ -68,6 +67,29 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, 
     return 0;
 }
 
+
+int BackendClient::RbdVolume::aio_read(u64 offset, size_t len,const char *buf, PdcCompletion *c)
+{
+    BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)this;
+
+    Msginfo *msg = new Msginfo();
+    //msg->getopid();
+    msg->opcode = PDC_AIO_READ;
+    strcpy(msg->client.pool, prbd->rados->GetName());
+    strcpy(msg->client.volume, prbd->rbdname.c_str());
+    msg->originbuf = buf;
+    msg->data.offset = offset;
+    msg->data.len = len;
+    msg->data.c = (void *)c;
+    //op->volume = (void *)prbd;
+    msg->insert_volume((void *)prbd);
+    msg->dump("rbd aio read");
+
+    pthread_mutex_lock(prbd->rados->ceph->_mutex);
+    prbd->rados->ceph->_queue->push_back(msg);
+    pthread_mutex_unlock(prbd->rados->ceph->_mutex);
+    return 0;
+}
 
 
 
