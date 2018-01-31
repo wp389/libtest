@@ -88,6 +88,8 @@ int BackendClient::RbdVolume::aio_read(u64 offset, size_t len,const char *buf, P
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio read");
 
+    /*add request to completion*/
+    c->add_request();
     pthread_mutex_lock(prbd->rados->ceph->_mutex);
     prbd->rados->ceph->_queue->push_back(msg);
     pthread_mutex_unlock(prbd->rados->ceph->_mutex);
