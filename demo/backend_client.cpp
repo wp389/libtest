@@ -37,7 +37,8 @@ int BackendClient::RbdVolume::init(int create = 0)
     return 0;
 }
 
-int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, PdcCompletion *c)
+int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf,
+								PdcCompletion *c)
 {
     BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)this;
     //PdcCompletion *comp = (PdcCompletion*)c;
@@ -62,6 +63,8 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, 
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio write");
 
+    /*add request to completion*/
+    c->add_request();
     pthread_mutex_lock(prbd->rados->ceph->_mutex);
     prbd->rados->ceph->_queue->push_back(msg);
     pthread_mutex_unlock(prbd->rados->ceph->_mutex);
