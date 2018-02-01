@@ -51,7 +51,7 @@ extern u64 opid;
 #define CLIENTNOCREATE 0
 
 #define SERVER_IO_BLACKHOLE 1
-
+#define 
 #define MULTIPIPE 1
 #define CHUNKSIZE 4096
 #define EPOLLSIZE 1024
