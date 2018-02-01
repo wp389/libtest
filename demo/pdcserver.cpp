@@ -261,7 +261,20 @@ int handle_listen_events(Pdcserver *pdc, Msginfo* op)
 
 
 }
+int del_event(int epfd, int listen_fd)
+{
+    struct epoll_event ev;
+    //ev.status = 0;
 
+    if (::epoll_ctl(epfd, EPOLL_CTL_DEL, listen_fd, NULL) < 0){
+        cerr<<"epoll set delete error: fd="<<ev.data.fd<<endl;  
+        return -1;  
+    }else {  
+        cerr<<"listening PIPE delete epoll success"<<endl; 
+    }
+    return 0;
+
+}
 int add_event(Pdcserver *pdc, int epfd, struct epoll_event &ev, Msginfo *op, int listen_fd)
 {
     int r;
@@ -369,6 +382,7 @@ void* Pdcserver::Finisherthreads::_process()
                 }else{
                     // need  delete ?
                     cerr<<"muliti pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+                    del_event(epfd, tfd);
                     pdc->msg_pool.free(op);
                 }
                 //cerr<<" fds:"<<fds <<" now is:"<<n<<" fd :"<<tfd<<endl;
@@ -521,7 +535,7 @@ int Pdcserver::init()
     }
 
     iothread = new Pdcserver::Iothreads("IO-threadpool", this);
-    iothread->init(1);
+    iothread->init(2);
 
     msgthread = new Msgthreads("MSG-threadpool",this);
     msgthread->init(2);
@@ -598,7 +612,7 @@ void Pdcserver::wait_to_shutdown()
 {
     
     iothread->join();     
-    msgthread->->join();
+    msgthread->join();
     listen->join();
 
 }

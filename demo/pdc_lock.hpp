@@ -49,7 +49,7 @@ public:
     int wait(PdcLock &mutex){
         //assert(wait_mutex != NULL || wait_mutex == &mutex);
         wait_mutex = &mutex;
-        assert(mutex.islocked());
+        //assert(mutex.islocked());
         //mutex.unlock();
         int r = pthread_cond_wait(&_cond, &mutex._mutex);
         //mutex.lock();
