@@ -15,16 +15,12 @@ typedef void (*pdc_callback_t)(pdc_rbd_completion_t c, void *arg);
 
 //(librbd::RBD::AioCompletion *)
 
-struct PdcCompletion {
+struct PdcCompletion{
     //void * comp;  //(librbd::RBD::AioCompletion *)
     PdcLock lock;
     PdcCond cond;
-    void *read_buf;
-    void *write_buf;
-    u64  buflen;
     int   retcode;
     int ref;
-    u64 opidx;
     Msginfo *op;
     pdc_callback_t callback;
     void * callback_arg;

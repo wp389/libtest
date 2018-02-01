@@ -270,10 +270,11 @@ extern "C" int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
     int r;
     PdcCompletion *comp = (PdcCompletion *)c;
     BackendClient::RbdVolume *prbd = (BackendClient::RbdVolume *)image;
-
-    r = prbd->aio_write(off, len, buf, comp);
+    PdcClient * pdc = pdc_client_mgr;
+    r = pdc->aio_write(prbd,off, len, buf, comp);
+    //r = prbd->aio_write(off, len, buf, comp);
     
-    return 0;
+    return r;
 }
 extern "C" int rbd_aio_read(rbd_image_t image, u64 off, size_t len,
 			    char *buf, rbd_completion_t c)
@@ -283,11 +284,12 @@ extern "C" int rbd_aio_read(rbd_image_t image, u64 off, size_t len,
     int r;
     PdcCompletion *comp = (PdcCompletion *)c;
     BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)image;
-
-    r = prbd->aio_read(off,  len, buf, comp);
+    PdcClient * pdc = pdc_client_mgr;
+    
+    r = pdc->aio_read(prbd, off,  len, buf, comp);
     
 
-    return  0;
+    return  r;
 
 }
 

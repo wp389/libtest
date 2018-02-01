@@ -117,7 +117,8 @@ public:
     Msginfo* register_put(Msginfo *op);
 
     friend void pdc_callback(rbd_completion_t cb, void *arg);
-	
+
+    void wait_to_shutdown();
 };
 
 extern Pdcserver*pdc_server_mgr;

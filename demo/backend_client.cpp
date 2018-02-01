@@ -40,18 +40,12 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf,
 								PdcCompletion *c)
 {
     BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)this;
-    //PdcCompletion *comp = (PdcCompletion*)c;
-	
-    //PdcClient *pdc = pdc_client_mgr;
+
+    Msginfo *msg  = prbd->rados->ceph->msg_pool->malloc();
+    msg->default_init();
     
-    //PdcOp *op= new PdcOp();
-    //Msginfo *msg = prbd->mq[RECVMQ].pop();
-   // Msginfo *msg = new Msginfo();
-	
-	Msginfo *msg  = prbd->rados->ceph->msg_pool->malloc();
-	msg->default_init();
     //msg->getopid();
-    msg->opcode = PDC_AIO_WRITE;
+    msg->opcode = PDC_AIO_PREWRITE;
     strcpy(msg->client.pool, prbd->rados->GetName());
     strcpy(msg->client.volume, prbd->rbdname.c_str());
     msg->originbuf = buf;
@@ -64,9 +58,12 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf,
 
     /*add request to completion*/
     c->add_request();
+    //prbd->enqueuefn(msg);
+
     pthread_mutex_lock(prbd->rados->ceph->_mutex);
     prbd->rados->ceph->_queue->push_back(msg);
     pthread_mutex_unlock(prbd->rados->ceph->_mutex);
+
     return 0;
 }
 
@@ -75,7 +72,9 @@ int BackendClient::RbdVolume::aio_read(u64 offset, size_t len,const char *buf, P
 {
     BackendClient::RbdVolume*prbd = (BackendClient::RbdVolume*)this;
 
-    Msginfo *msg = new Msginfo();
+    //Msginfo *msg = new Msginfo();
+    Msginfo *msg  = prbd->rados->ceph->msg_pool->malloc();
+    msg->default_init();
     //msg->getopid();
     msg->opcode = PDC_AIO_READ;
     strcpy(msg->client.pool, prbd->rados->GetName());
@@ -87,9 +86,10 @@ int BackendClient::RbdVolume::aio_read(u64 offset, size_t len,const char *buf, P
     //op->volume = (void *)prbd;
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio read");
-
+    
     /*add request to completion*/
     c->add_request();
+    //prbd->enqueuefn(msg);
     pthread_mutex_lock(prbd->rados->ceph->_mutex);
     prbd->rados->ceph->_queue->push_back(msg);
     pthread_mutex_unlock(prbd->rados->ceph->_mutex);

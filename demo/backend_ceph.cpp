@@ -62,36 +62,6 @@ int CephBackend::RbdVolume::init(int create = 0)
     }
     return 0;
 }
-/*
-int CephBackend::RbdVolume::aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c)
-{
-    CephBackend::RbdVolume*prbd = (CephBackend::RbdVolume*)this;
-    PdcCompletion *comp = (PdcCompletion*)c;
-	
-    //PdcClient *pdc = pdc_client_mgr;
-    
-    //PdcOp *op= new PdcOp();
-    //Msginfo *msg = prbd->mq[RECVMQ].pop();
-    Msginfo *msg = new Msginfo();
-    //msg->getopid();
-    msg->opcode = PDC_AIO_WRITE;
-    strcpy(msg->client.pool, prbd->rados->GetName());
-    strcpy(msg->client.volume, prbd->rbdname.c_str());
-    msg->originbuf = buf;
-    msg->data.offset = offset;
-    msg->data.len = len;
-    msg->data.c = c;
-    //op->volume = (void *)prbd;
-    msg->insert_volume((void *)prbd);
-    msg->dump("rbd aio write");
-
-
-    prbd->rados->ceph->_queue->push_back(msg);
-
-    return 0;
-}
-*/
-
 
 int CephBackend::RbdVolume::do_create_rbd_completion(void * op, rbd_completion_t *comp )
 {

@@ -11,9 +11,6 @@
 #include "completion.hpp"
 #include "pdc_lock.hpp"
 
-//#include "shmmem.hpp"
-//#include "pipe.hpp"
-
 using namespace std;
 
 class CephBackend{
@@ -33,7 +30,7 @@ public:
         rados_ioctx_t ioctx;
         map<string , void *> volumes;
     public:
-        RadosClient(string nm, string _conf,CephBackend *_ceph);
+        RadosClient(string nm, string _conf, CephBackend *_ceph);
         ~RadosClient() {}
         const char * GetName() {return radosname.c_str();}
         int init(int create);
@@ -43,20 +40,15 @@ public:
         string rbdname;
         RadosClient *rados;
         rbd_image_t image;
-
-        //Pipe<Msginfo> pipe;
     public:
             map<string ,void*>mq;
     public:
         RbdVolume(string nm, RadosClient* _rados): 
             rbdname(nm),rados(_rados)
-            //pipe(rbdname.c_str(), 12, PIPEWRITE, PIPECLIENT) 
             {}
         ~RbdVolume() {}  //todo close pipe
         int init(int create);
         const char * GetName() {return rbdname.c_str();}
-        int aio_write(u64 offset, size_t len,const char *buf, pdc_rbd_completion_t cb);
-        //static void pdc_callback(rbd_completion_t cb, void *arg);
         int do_create_rbd_completion(void * op, rbd_completion_t *comp );
         int do_aio_write(void *_op,u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c);
         int do_aio_read(void *_op,u64 offset, size_t len, char *buf, pdc_rbd_completion_t c);
@@ -76,8 +68,4 @@ public:
 
 
 extern void pdc_callback(rbd_completion_t cb, void *arg);
-
-
-//int release_shmkey(vector<u64> & indexlist );
-
 #endif

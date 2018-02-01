@@ -100,14 +100,24 @@ public:
     Threadpool(): size(1),_stop(true) {};
      ~Threadpool(){
         _stop = false;
+        /*
         map<int, pthread_t>::iterator it;
         for(it = threads.begin();it!= threads.end();it++){
             pthread_join(it->second, NULL);
             cerr<< "thread:"<<name<<" ["<<it->first<<"] stoped"<<endl;
 	 }
-
-    };
+        */
+    }
+    
+    void join(){
+        map<int, pthread_t>::iterator it;
+        for(it = threads.begin();it!= threads.end();it++){
+            pthread_join(it->second, NULL);
+            cerr<< "thread:"<<name<<" ["<<it->first<<"] stoped"<<endl;
+	 }
+    }
     bool stop() {return _stop;}
+    bool shutdown() {return false;}
 protected:
     virtual void *_process() = 0;
 public:
@@ -178,15 +188,16 @@ typedef enum {
     OPEN_RBD,			//11
     PDC_AIO_STAT,		//12
     PDC_ADD_EPOLL,		//13
-    PDC_AIO_WRITE,		//14
-    PDC_AIO_READ,		//15
-    GET_MEMORY,			//16
-    ACK_MEMORY,			//17
+    PDC_AIO_PREWRITE,	//14
+    PDC_AIO_WRITE,		//15
+    PDC_AIO_READ,		//16
+    GET_MEMORY,			//17
+    ACK_MEMORY,			//18
     RW_OP,
     MGR_OP,
     RW_FINISH,
-    RW_W_FINISH,		//21
-    RW_R_FINISH,			//22
+    RW_W_FINISH,		//22
+    RW_R_FINISH,			//23
     PUT_SHM,
 
 }PdcIomachine;
@@ -266,6 +277,7 @@ struct  Msginfo{
     PdcClientInfo client;
     pdcdata data;
     const void * originbuf;
+    
     void * op;			//
     void * volume;		//rbd volume info in client or server
     int return_code;
@@ -383,38 +395,8 @@ public:
 };
 
 
-/*
-struct PdcOp{
-    u64 opidx;
-    pid_t pid;
-    PdcIomachine op;
-    pdcdata data;
-    PdcClientInfo client;
-    u64 volume;
-    char *originbuf;
-    int ret;
-    bool sw;
-public:
-    PdcOp():sw(true) {pid=getpid(); opidx = ++opid;};
-    void insert_volume(void *p_v){
-        volume = p_v;
-    }
+typedef int ( * EnqFn)(Msginfo *op);
 
-    void dump(){
-        if(!sw) return;
-        cerr<<"op info:"<<endl;
-        cerr<<"opid = "<<opidx;
-        cerr<<" ,pid ="<<pid;
-        cerr<<" ,op = "<<op;
-        cerr<<" ,client.pool ="<<client.pool;
-        cerr<<" ,client.rbd ="<<client.volume;
-        cerr<<" ,client.pipekey ="<<client.pipekey;
-        cerr<<" ,offset ="<<data.offset;
-	cerr<<" ,len ="<<data.len<<endl;
-}
-
-};
-*/
 
 
 

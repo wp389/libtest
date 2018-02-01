@@ -41,14 +41,14 @@ public:
     PdcPipe<Msginfo> msgmq;
     PdcPipe<Msginfo>::ptr sendmq;
     PdcPipe<Msginfo>::ptr ackmq;
+    map<string , void*> mq;
     //map<map<string, string>, PdcPipe<Msginfo>* > ackmq;
     //list<PdcOp> queue_io;
-    list<Msginfo> queue_ms;
     Perfs *performace;
     ShmMem<simpledata> slab;
     map<string,BackendClient *> clusters;
 	MemPool<Msginfo> msg_pool;
-	
+    friend class BackendClient;
 public:
     class Iothreads :public Threadpool{
         string desc;
@@ -92,6 +92,7 @@ public:
     list<Msginfo *> listenop;
     Finisherthreads *listen;
 
+    int msg_working;
     PdcCond msgcond;
     PdcLock msglock;
     list<Msginfo *>msgop;
@@ -134,8 +135,15 @@ public:
     int init();
     void inc_ref() {ref ++;}
     void OpFindClient(Msginfo *&op);
-
- 	
+    int enqueue(Msginfo *op){
+        msglock.lock();
+        msgop.push_back(op);
+        msgcond.Signal();
+        msglock.unlock();
+        
+    }
+    int aio_write(BackendClient::RbdVolume *prbd, u64 offset, size_t len,const char *buf, PdcCompletion *c);
+    int aio_read(BackendClient::RbdVolume *prbd, u64 offset, size_t len,const char *buf, PdcCompletion *c);
 };
 
 

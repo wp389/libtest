@@ -19,7 +19,8 @@ public:
     void *sendmq;
     list<Msginfo *> *_queue;
     pthread_mutex_t *_mutex;
-	MemPool<Msginfo> *msg_pool;
+    MemPool<Msginfo> *msg_pool;
+    EnqFn enqueuefn;
 public:
     class RadosClient{
         string radosname;
@@ -37,10 +38,12 @@ public:
     };
     class RbdVolume{
         string rbdname;
-        RadosClient *rados;
-
+		
+        
     public:
-            map<string ,void*>mq;
+        
+        RadosClient *rados;
+        map<string ,void*>mq;
     public:
         RbdVolume(string nm, RadosClient* _rados): 
             rbdname(nm),rados(_rados)
@@ -53,6 +56,8 @@ public:
         int aio_write(u64 offset, size_t len,const char *buf, PdcCompletion* c);
         
         int aio_read(u64 offset, size_t len,const char *buf, PdcCompletion* c);
+
+
         //static void pdc_callback(rbd_completion_t cb, void *arg);
         //int do_create_rbd_completion(void * op, rbd_completion_t *comp );
         //int do_aio_write(void *_op,u64 offset, size_t len,const char *buf, pdc_rbd_completion_t c);
@@ -67,6 +72,9 @@ public:
     BackendClient(string nm, string confpath, list<Msginfo *>* msgop,
 			pthread_mutex_t *mutex, MemPool<Msginfo> *_msg_pool);
     ~BackendClient() {}
+    void setqueuefn(EnqFn _enq){
+        enqueuefn = _enq;
+    }
 
     void *findclient(map<string, string> *opclient);
 };

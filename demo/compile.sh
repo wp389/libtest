@@ -1,6 +1,5 @@
 echo "start to compile"
-rm obj/* -f
-#g++ pdcserver.cpp backend_ceph.cpp pipe.cpp type.cc pdc_lock.cpp -g -std=c++11 -o obj/server -lpthread -Wl,-rpath=/lib64/ -L/lib64/ -lrbd -lrados  #2>obj/server.log
+rm obj/server obj/libpdc* obj/vmtest  -f
 
 g++ pdcserver.cpp backend_ceph.cpp pipe.cpp type.cc pdc_lock.cpp -g -std=c++11 -o obj/server -lpthread  -lboost_system -L/lib64/ -lrbd -lrados  #2>obj/server.log
 

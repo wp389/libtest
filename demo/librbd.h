@@ -72,7 +72,7 @@ typedef struct {
   char parent_name[RBD_MAX_IMAGE_NAME_SIZE];  /* deprecated */
 } rbd_image_info_t;
 
- void rbd_version(int *major, int *minor, int *extra);
+void rbd_version(int *major, int *minor, int *extra);
 
 
 int rbd_open(rados_ioctx_t io, const char *name,

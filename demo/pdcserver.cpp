@@ -4,6 +4,7 @@
 
 //#include "type.h"
 #include "pdcserver.hpp"
+#include <sys/prctl.h>
 //#include "backend_ceph.hpp"
 
 Pdcserver*pdc_server_mgr;
@@ -130,14 +131,16 @@ void* Pdcserver::Iothreads::_process()
     static bool flag = false;
     Pdcserver *pdc = (Pdcserver *)server;
     CephBackend::RbdVolume *vol;
+
+    prctl(PR_SET_NAME, "IOthread");
     cerr<<"IOthread "<<pthread_self()<<" start"<<endl;
     
     while(1){
         if(stop()) continue;
         
         pdc->iolock.lock();
-
-        //pdc->iocond.wait(pdc->iolock);
+        while(pdc->ops.empty())
+            pdc->iocond.wait(pdc->iolock);
         list<Msginfo *> oplist;
         oplist.swap(pdc->ops);
         pdc->iolock.unlock();
@@ -224,10 +227,9 @@ int handle_listen_events(Pdcserver *pdc, Msginfo* op)
             op->dump("listen thread get op");
         switch(op->opcode){
         case PDC_AIO_WRITE:
-            //op->opcode == PDC_AIO_WRITE;
             pdc->iolock.lock();
             pdc->ops.push_back(op);
-            //pdc->iocond.Signal();
+            pdc->iocond.Signal();
             pdc->iolock.unlock();
             
             break;
@@ -235,21 +237,21 @@ int handle_listen_events(Pdcserver *pdc, Msginfo* op)
         case PDC_AIO_READ:
             pdc->iolock.lock();
             pdc->ops.push_back(op);
-            //pdc->iocond.Signal();
+            pdc->iocond.Signal();
             pdc->iolock.unlock();
             
             break;
         case GET_MEMORY:
             pdc->msglock.lock();
             pdc->msgop.push_back(op);
-            //pdc->msgcond.Signal();
+            pdc->msgcond.Signal();
             pdc->msglock.unlock();
             	
             break;
         default:  //mgr cmd
             pdc->msglock.lock();
             pdc->msgop.push_back(op);
-            //pdc->msgcond.Signal();
+            pdc->msgcond.Signal();
             pdc->msglock.unlock();
             
             break;
@@ -275,7 +277,7 @@ int add_event(Pdcserver *pdc, int epfd, struct epoll_event &ev, Msginfo *op, int
             p_pipe =reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(vol->mq[RECVMQ]);
             ev.data.fd = p_pipe->GetFd();
             if(ev.data.fd < 0 ){
-                cerr<<"add_event fd is "<<ev.data.fd<<" maybe not opened"<<endl;
+                cerr<<"add_event fd is "<< ev.data.fd<<" maybe not opened"<<endl;
                 return  -1;
             }
         }
@@ -302,6 +304,8 @@ void* Pdcserver::Finisherthreads::_process()
     Pdcserver *pdc = (Pdcserver *)server;
     CephBackend::RbdVolume *prbd;
     pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
+
+    prctl(PR_SET_NAME, "Listenthread");
     cerr<<"listen thread  start"<<endl;
     r = pdc->msgmq.openpipe();
     if(r< 0){
@@ -337,7 +341,7 @@ void* Pdcserver::Finisherthreads::_process()
             * we need to check if need to add new fd to epoll
             */
             //Msginfo *op = new Msginfo();
-			Msginfo *op = pdc->msg_pool.malloc();
+            Msginfo *op = pdc->msg_pool.malloc();
             r = ::read(tfd, op, bufsize);
             
             if(( tfd == listenfd )&& (events[n].events & EPOLLIN)){  //
@@ -354,18 +358,18 @@ void* Pdcserver::Finisherthreads::_process()
 					   op->init_after_read();
                        r = handle_listen_events(server,op);
                   }else{
-                       cerr<<"pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+                       cerr<<"msg pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
 					   pdc->msg_pool.free(op);
                   }
                 }
             }else{
                 if(r == bufsize){
-					op->init_after_read();
+                    op->init_after_read();
                     r = handle_listen_events(server,op);
                 }else{
-                        // need  delete ?
-                        cerr<<"pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
-						pdc->msg_pool.free(op);
+                    // need  delete ?
+                    cerr<<"muliti pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+                    pdc->msg_pool.free(op);
                 }
                 //cerr<<" fds:"<<fds <<" now is:"<<n<<" fd :"<<tfd<<endl;
             }
@@ -390,17 +394,20 @@ void* Pdcserver::Msgthreads::_process()
     pdcPipe::PdcPipe<Msginfo>::ptr pipe;
 
     Pdcserver *pdc = (Pdcserver *)server;
+
+    prctl(PR_SET_NAME, "MSGthread");
     cerr<<"MSGthread "<<pthread_self()<<" start"<<endl;
 
     //pdc->msglock.lock();
     while(1){
         if(stop() ) continue;
         pdc->msglock.lock();
-        
+        while(pdc->msgop.empty())
+            pdc->msgcond.wait(pdc->msglock);
         list<Msginfo *> oplist;
         oplist.swap(pdc->msgop);
         pdc->msglock.unlock();
-
+        
         while(!oplist.empty()){
             Msginfo *msg =oplist.front();
             oplist.pop_front();
@@ -501,30 +508,24 @@ int Pdcserver::init()
     clusters["ceph"] = pceph;
     pceph->radoses.clear();
     pceph->vols.clear();
-    //slab = new wp::shmMem::shmMem(MEMKEY, SERVERCREATE);
+
     ret = slab.Init();
     if(ret < 0){
         cerr<<"slab init faled:"<<ret<<endl;
         return -1;
     }
     
-    //msgmq = new wp::Pipe::Pipe(PIPEKEY, MEMQSEM, PIPEREAD,wp::Pipe::SYS_t::PIPESERVER);
     ret = msgmq.Init();
     if(ret < 0){
         cerr<<"msgmq init faled:"<<ret<<endl;
     }
-    //pthread_cond_init(&iocond);
-    //pthread_mutex_init(&iomutex,NULL);
+
     iothread = new Pdcserver::Iothreads("IO-threadpool", this);
     iothread->init(1);
 
-    //pthread_cond_init(&msgcond);
-    //pthread_mutex_init(&msgmutex,NULL);
     msgthread = new Msgthreads("MSG-threadpool",this);
     msgthread->init(2);
 
-    //pthread_cond_init(&finicond);
-    //pthread_mutex_init(&finimutex,NULL);
     listen = new Finisherthreads("Finisher threadpool", this);
     listen->init(1);	
 
@@ -593,7 +594,14 @@ void Pdcserver::OpFindClient(Msginfo *&op)
     
 }
 
+void Pdcserver::wait_to_shutdown()
+{
+    
+    iothread->join();     
+    msgthread->->join();
+    listen->join();
 
+}
 
 int main()
 {
@@ -607,12 +615,15 @@ int main()
         cerr<<"server init failed"<<endl;
         return -1;
     }
+    /*
     r = 0;
     while(1){
        r++;
 	sleep(1);
     }
-    
+    */
+    server->wait_to_shutdown();
+    //todo : shutdown
     return 0;
 }
 

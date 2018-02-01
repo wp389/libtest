@@ -21,4 +21,8 @@ msg mempool is ok
 aio read is ok,
 blockhole is 240-250k iops to randread.
 
+2018:2-1
+thread name can be seen
+for client: pipe use pdcclient not prbd,then 
+randwrite can up to max 280k iops ,average 400+us with blackhole.
 

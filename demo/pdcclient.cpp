@@ -4,6 +4,8 @@
 
 //#include "type.h"
 #include "pdcclient.hpp"
+#include <sys/prctl.h>
+
 //#include "backend_ceph.hpp"
 
 int PdcClient::Iothreads::do_op(void * data)
@@ -21,6 +23,8 @@ void* PdcClient::Iothreads::_process()
     PdcClient *pdc = (PdcClient *)pc;
     BackendClient::RbdVolume *prbd;
     pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
+	
+    prctl(PR_SET_NAME, "IOthread");
     cerr<<"IOthread "<<pthread_self()<<" start"<<endl;
     
     while(1){
@@ -31,8 +35,6 @@ void* PdcClient::Iothreads::_process()
         //pdc->opcond.wait( pdc->iolock);
         list<Msginfo*>oplist;
         oplist.swap(pdc->ops);
-        //Msginfo *msg = pdc->ops.front();
-        //pdc->ops.pop_front();
         pdc->iolock.unlock();
 
         while(!oplist.empty()){
@@ -40,37 +42,30 @@ void* PdcClient::Iothreads::_process()
         oplist.pop_front();
         msg->dump("iothread: client io tp op");
         if(msg->opcode == PDC_AIO_WRITE){
-            //cerr<<"push op aio write:"<<msg->opid<<endl;
             pdc->OpFindClient(msg);
             prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume());
             if(!prbd){
             cerr<<"get NULL volume"<<endl;
-            //delete op;
             assert(0);
             continue;
             }
             u64 bufsize = msg->data.len;
             char * buf = (char *)msg->originbuf;
             for(int i = 0;i < msg->data.chunksize;i++){
-                //memset(op->data.pdata, 6, op->data.len);
                 u64 size = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
                 
                 simpledata * pdata = pdc->slab.getaddbyindex(msg->data.indexlist[i]);
                 //TODO: WRITE
                 ::memcpy(pdata, &(buf[i*CHUNKSIZE]), size);
-                //r = do_op(,pdata);
                 bufsize -= CHUNKSIZE;
             }
             p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
             r = p_pipe->push(msg);
             if(r< 0){
                 cerr<<"push op aio write:"<<msg->opid<<" failed"<<endl;
-                //delete msg;
-                //continue;
             }
         }
-        
-        //delete msg;
+     
         pdc->msg_pool.free(msg);
     }//while()
 		
@@ -85,8 +80,10 @@ void* PdcClient::Finisherthreads::_process()
     Msginfo *msg;
     Msginfo * op;
     u64 s = 0;
-	int r;
+    int r;
     pdcPipe::PdcPipe<Msginfo>* p_pipe;
+    
+    prctl(PR_SET_NAME, "Listenthread");
     cerr<<"listen thread  start"<<endl;
     
     while(1){
@@ -96,39 +93,41 @@ void* PdcClient::Finisherthreads::_process()
             continue;
         }
 	 //cerr<<"to start open"<<endl;
-		msg = pdc->msg_pool.malloc();
-	 	assert(msg != NULL);
+        msg = pdc->msg_pool.malloc();
+        assert(msg != NULL);
         r = p_pipe->pop(msg);
         if(0 != r){
 		    cerr<<"pop size is:"<<r<<endl;
 			pdc->msg_pool.free(msg);
 			continue;
         }
-	 	msg->init_after_read();
+        msg->init_after_read();
 
         if(msg){
             msg->dump("client finish tp op");
             switch(msg->opcode){
             case ACK_MEMORY:
                 msg->opcode = PDC_AIO_WRITE;
-                pdc->iolock.lock();
-                pdc->ops.push_back(msg);
-                //pdc->opcond.Signal();
-                pdc->iolock.unlock();
+                pdc->msglock.lock();
+                pdc->msgop.push_back(msg);
+                //pdc->msgcond.Signal();
+                pdc->msglock.unlock();
+                pdc->msgcond.Signal();
                 break;
             case RW_W_FINISH:
                 pdc->msglock.lock();
                 pdc->msgop.push_back(msg);
-                //pdc->msgcond.Signal();
+                pdc->msgcond.Signal();
                 pdc->msglock.unlock();
                 break;
             case RW_R_FINISH:
                 pdc->msglock.lock();
                 pdc->msgop.push_back(msg);
-                //pdc->msgcond.Signal();
+                pdc->msgcond.Signal();
                 pdc->msglock.unlock();
                 break;
              default:
+                cerr<<"finish op:"<<msg->opcode<<endl;
                 assert(0);
                 break;
         }
@@ -144,20 +143,29 @@ void* PdcClient::Msgthreads::_process()
 {
     int r;
     map<string , u64> sum;
+    u64 bufsize, size;
+    char * buf;
+    simpledata * pdata;
     pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
     BackendClient::RbdVolume *prbd;
     PdcClient *pdc = (PdcClient *)pc;
     PdcCompletion *c;
-    cerr<<"IOthread "<<pthread_self()<<" start"<<endl;
+	
+    prctl(PR_SET_NAME, "MSGthread");
+    cerr<<"MSGthread "<<pthread_self()<<" start"<<endl;
     
+	
     while(1){
         if(stop() ) continue;
 
         pdc->msglock.lock();
-        //pdc->msgcond.wait(pdc->msglock);
+        //pdc->msg_working++;
+        /*如果队列为0，等待*/
+        if(pdc->msgop.empty() )
+            pdc->msgcond.wait(pdc->msglock);
         list<Msginfo *> oplist;
         oplist.swap(pdc->msgop);
-       pdc->msglock.unlock();
+        pdc->msglock.unlock();
 
         while(!oplist.empty()){
         Msginfo *msg =  oplist.front();
@@ -173,10 +181,9 @@ void* PdcClient::Msgthreads::_process()
         if(msg){
             msg->dump("client msg tp op");
             std::map<string,string> client;
-            //assert(msg->client.cluster == "ceph");
             client[msg->client.pool] = msg->client.volume;
             //perf.inc();
-            prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume()); 
+            //prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume()); 
             
             switch(msg->opcode){
             case OPEN_RADOS:
@@ -185,14 +192,13 @@ void* PdcClient::Msgthreads::_process()
             case OPEN_RBD:
                  cerr<<"do not come here rbd"<<msg->opid<<endl;
                  break;
-            case PDC_AIO_WRITE:
-                assert(prbd);
+            case PDC_AIO_PREWRITE:
+                //assert(prbd);
                 msg->opcode =GET_MEMORY;
-                //list<u64> listadd ;
                 //TODO:SET START TIME
                 msg->getopid();
-                //cerr<<"start to get memory"<<endl;
-                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
+                //p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
+                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)pdc->mq[SENDMQ]; 
                 assert(p_pipe);
                 r = p_pipe->push(msg);
                 if(r< 0){
@@ -200,13 +206,39 @@ void* PdcClient::Msgthreads::_process()
                     msg->dump(" msg push failed" );
                 }
                 break;
+            case PDC_AIO_WRITE:
+                //pdc->OpFindClient(msg);
+                /*
+                prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume());
+                if(!prbd){
+                    cerr<<"get NULL volume"<<endl;
+                     //delete op;
+                     assert(0);
+                    break;
+                }
+                */
+                bufsize = msg->data.len;
+                buf = (char *)msg->originbuf;
+                for(int i = 0;i < msg->data.chunksize;i++){
+                    size = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
+                    pdata = pdc->slab.getaddbyindex(msg->data.indexlist[i]);
+                     //TODO: WRITE
+                    ::memcpy(pdata, &(buf[i*CHUNKSIZE]), size);
+                    //r = do_op(,pdata);
+                    bufsize -= CHUNKSIZE;
+                }
+                p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(pdc->mq[SENDMQ]);
+                r = p_pipe->push(msg);
+                if(r< 0){
+                    cerr<<"push op aio write:"<<msg->opid<<" failed"<<endl;
+                }
 
+                break;
                 //TODO:SET END TIME
             case PDC_AIO_READ:
                 //TODO:SET START TIME
                 msg->getopid();
-                assert(prbd);
-                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
+                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)pdc->mq[SENDMQ]; 
                 assert(p_pipe);
                 r = p_pipe->push(msg);
                 if(r< 0){
@@ -236,15 +268,13 @@ void* PdcClient::Msgthreads::_process()
                     c->complete(msg->return_code);
                     c->release();
                 }
+				
                 // whether send cmd to server to put sharedmemory
                 msg->opcode = PUT_SHM;
-                
                 msg->getopid();
-                
-                //cerr<<"start to get memory"<<endl;
-                pdc->OpFindClient( msg);
-                prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume());
-                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
+                //pdc->OpFindClient( msg);
+                //prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume());
+                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)pdc->mq[SENDMQ]; 
                 assert(p_pipe);
                 r = p_pipe->push(msg);
                 if(r< 0){
@@ -254,7 +284,7 @@ void* PdcClient::Msgthreads::_process()
                 break;
             
             default:
-                cerr<<"other code? "<<msg->opcode<<endl;
+                cerr<<"other code? :"<<msg->opcode<<endl;
                 break;
 				
         }
@@ -283,7 +313,7 @@ int PdcClient::init()
     BackendClient* pceph = new BackendClient("ceph","/etc/ceph/ceph.conf", 
 						&msgop, &msglock._mutex, &msg_pool);
     clusters["ceph"] = pceph;
-    //slab = new wp::shmMem::shmMem(MEMKEY, SERVERCREATE);
+    //pceph->setqueuefn(&enqueue);
     ret = slab.Init();
     if(ret < 0){
         cerr<<"slab init faled:"<<ret<<endl;
@@ -300,28 +330,34 @@ int PdcClient::init()
     
     ackmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >( mqs[RECVMQ]);
     sendmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>* >( mqs[SENDMQ]);
-    
+    if(MULTIPIPE){
+        mq.swap(mqs);
+    }else{
+        mq.insert(pair<string,void *>(SENDMQ, (void*)&msgmq));
+        mq.insert(pair<string,void *>(RECVMQ, (void*)ackmq));
+    }
     //msgmq = new wp::Pipe::Pipe(PIPEKEY, MEMQSEM, PIPEREAD,wp::Pipe::SYS_t::PIPESERVER);
     ret = msgmq.Init();
     if(ret < 0){
         cerr<<"msgmq init faled:"<<ret<<endl;
     }
 
+    /*
     iothread = new PdcClient::Iothreads("IO-threadpool", this);
     iothread->init(1);
-
+    */
     msgthread = new Msgthreads("MSG-threadpool",this);
-    msgthread->init(1);
+    msgthread->init(2);
 
     listen = new Finisherthreads("Finisher threadpool", this);
     listen->init(1);	
 	
-    ops.clear();
+    //ops.clear();
     listenop.clear();
     msgop.clear();
 
     listen->start();
-    iothread->start();
+    //iothread->start();
     msgthread->start();
     
     cerr<<"pdcclient init over"<<endl;
@@ -345,6 +381,61 @@ void PdcClient::OpFindClient(Msginfo *&op)
     op->volume =  backend->findclient( &opclient);
     assert(op->volume);
 
+}
+
+
+int PdcClient::aio_write(BackendClient::RbdVolume *prbd, u64 offset, size_t len,const char *buf,
+								PdcCompletion *c)
+{
+
+    Msginfo *msg  = msg_pool.malloc();
+    msg->default_init();
+    
+    //msg->getopid();
+    msg->opcode = PDC_AIO_PREWRITE;
+    strcpy(msg->client.pool, prbd->rados->GetName());
+    strcpy(msg->client.volume, prbd->GetName());
+    msg->originbuf = buf;
+    msg->data.offset = offset;
+    msg->data.len = len;
+    msg->data.c = (void *)c;
+    msg->insert_volume((void *)prbd);
+    msg->dump("rbd aio write");
+
+    /*add request to completion*/
+    c->add_request();
+    enqueue(msg);
+
+    return 0;
+}
+
+
+int PdcClient::aio_read(BackendClient::RbdVolume *prbd, u64 offset, size_t len,const char *buf, PdcCompletion *c)
+{
+
+    Msginfo *msg  = msg_pool.malloc();
+    msg->default_init();
+    //msg->getopid();
+    msg->opcode = PDC_AIO_READ;
+    strcpy(msg->client.pool, prbd->rados->GetName());
+    strcpy(msg->client.volume, prbd->GetName());
+    msg->originbuf = buf;
+    msg->data.offset = offset;
+    msg->data.len = len;
+    msg->data.c = (void *)c;
+    //op->volume = (void *)prbd;
+    msg->insert_volume((void *)prbd);
+    msg->dump("rbd aio read");
+    
+    /*add request to completion*/
+    c->add_request();
+    enqueue(msg);
+    /*
+    pthread_mutex_lock(prbd->rados->ceph->_mutex);
+    prbd->rados->ceph->_queue->push_back(msg);
+    pthread_mutex_unlock(prbd->rados->ceph->_mutex);
+    */
+    return 0;
 }
 
 

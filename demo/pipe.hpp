@@ -241,19 +241,19 @@ public:
                         return r;
 			}
 
-			int pop(T* t) {
+            int pop(T* t) {
                 int r = 0;
                 //cerr<<"pipe to pop:"<<m_key<<endl;
                 //semLockGuard oLock(m_Sem);
                 if (!t) {
-					return -1;
+                    return -1;
                 }
                 if(openpipe() < 0 ) return -1;
                 if (isEmpty()) {
                     return -1;//应该选择抛出异常等方式，待改进；
                 }
                 //T *t = new T();
-			    //while(r  <= 0)		
+                //while(r  <= 0)		
                     r = ::read(fd, t ,sizeof(T));  //block
                     
                     if(r == sizeof(T)){
@@ -264,7 +264,7 @@ public:
                     }
 			}
 			
-                    void clear() { memset(t,0,sizeof(T));}
+                    void clear() { }
 			std::string GetErrMsg() {
 				return m_sErrMsg;
 			}
