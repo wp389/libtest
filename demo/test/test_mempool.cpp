@@ -4,18 +4,21 @@
 #include <pthread.h>
 #include <vector>
 #include "../mempool.hpp"
-#include <boost/pool/pool.hpp>
+#include "../boost_mempool.hpp"
 
 using namespace std;
 
-#define THREAD_NUM 4
-#define ALLOC_NUM 1000
-#define TEST_TIMES 50000
-#define ALLOC_SIZE 512
+#define THREAD_NUM 2
+#define TEST_TIMES 1000
+#define ALLOC_NUM 50000
+#define ALLOC_SIZE 100
 #define US_PER_SEC 1000000ul
 #define MS_PER_SEC 1000
-#define MEMPOOL_ALLOC 0
-#define NEW_ALLOC 1
+enum {
+	NEW_ALLOC = 1,
+	BOOSTPOOL_ALLOC = 2,
+	MYTPOOL_ALLOC = 3,
+};
 
 struct MyType {
 	int _a;
@@ -23,11 +26,13 @@ struct MyType {
 	char _c[ALLOC_SIZE];
 };
 
-MemPool<MyType> pool;
+BoostMemPool<MyType> boost_pool;
+MemPool<MyType> my_pool;
 
 static void *alloc_func(void *arg) {
 	//boost::pool<> pool(sizeof(struct MyType));
-	struct MyType *mempool_objs[ALLOC_NUM];
+	struct MyType *boostpool_objs[ALLOC_NUM];
+	struct MyType *mypool_objs[ALLOC_NUM];
 	struct MyType *new_objs[ALLOC_NUM];
 	struct timeval start;
     struct timeval end;
@@ -38,38 +43,58 @@ static void *alloc_func(void *arg) {
 	printf("my thread is %u\n", tid);
 
 	gettimeofday(&start, NULL);
-
-	if (MEMPOOL_ALLOC == (*(int *)arg)) {
-		for (int j = 0; j < TEST_TIMES; j++) {
-				for (int k = 0; k < ALLOC_NUM; k++) {
-					MyType *p = (struct MyType *)pool.malloc();
-					p->_a = k;
-					p->_b = (222 + j);
-					mempool_objs[k] = p;
+	if (NEW_ALLOC == (*(int *)arg)) {
+		printf("do new alloc\n");
+		for (int i = 0; i < TEST_TIMES; i++) {
+				for (int j = 0; j < ALLOC_NUM; j++) {
+					MyType *p = new MyType();
+					p->_a = j;
+					p->_b = 333 + i;
+					new_objs[j] = p;
+				}
+		
+				for (int k = 0; k < ALLOC_NUM; ++k) {
+					assert(((struct MyType *)new_objs[k])->_b == (333 + i));
+					delete new_objs[k];
+					new_objs[k] = NULL;
+				}
+		}
+	} else if (BOOSTPOOL_ALLOC == (*(int *)arg)) {
+		printf("do boost alloc\n");
+		for (int i = 0; i < TEST_TIMES; i++) {
+				for (int j = 0; j < ALLOC_NUM; j++) {
+					MyType *p = (struct MyType *)boost_pool.malloc();
+					p->_a = j;
+					p->_b = (444 + i);
+					boostpool_objs[j] = p;
 					//printf("1111111111\n");
 				}
 		
-				for (int i = 0; i < ALLOC_NUM; ++i) {
-					assert(((struct MyType *)mempool_objs[i])->_b == (222 + j));
-					pool.free(mempool_objs[i]);
-					mempool_objs[i] = NULL;
+				for (int k = 0; k < ALLOC_NUM; k++) {
+					assert(((struct MyType *)boostpool_objs[k])->_b == (444+ i));
+					boost_pool.free(boostpool_objs[k]);
+					boostpool_objs[k] = NULL;
 				}
 				//printf("2222222222\n");
 		}
-	} else if (NEW_ALLOC == (*(int *)arg)) {
-		for (int j = 0; j < TEST_TIMES; j++) {
-				for (int k = 0; k < ALLOC_NUM; k++) {
-					MyType *p = new MyType();
-					p->_a = k;
-					p->_b = 333 + j;
-					new_objs[k] = p;
+	} else if (MYTPOOL_ALLOC == (*(int *)arg)) {
+		for (int i = 0; i < TEST_TIMES; i++) {
+				for (int j = 0; j < ALLOC_NUM; j++) {
+					MyType *p = (struct MyType *)my_pool.malloc();
+					//printf("1111111111\n");
+					p->_a = j;
+					p->_b = (555 + i);
+					mypool_objs[j] = p;
+					//printf("1111111111\n");
 				}
 		
-				for (int i = 0; i < ALLOC_NUM; ++i) {
-					assert(((struct MyType *)new_objs[i])->_b == (333 + j));
-					delete new_objs[i];
-					new_objs[i] = NULL;
+				for (int k = 0; k < ALLOC_NUM; k++) {
+					assert(((struct MyType *)mypool_objs[k])->_b == (555+ i));
+					my_pool.free(mypool_objs[k]);
+					//printf("2222222222\n");
+					mypool_objs[k] = NULL;
 				}
+				//printf("2222222222\n");
 		}
 	} else {
 		assert(0);
@@ -90,12 +115,12 @@ int main() {
 	//boost::pool<> pool(sizeof(struct MyType));
 	pthread_t t[THREAD_NUM];
 	int ret;
-	int mempool_alloc = MEMPOOL_ALLOC;
-	int new_alloc = NEW_ALLOC; 
+	int alloc_type;
 
-	printf("---test mempool---\n");
+	printf("---test new---\n");
+	alloc_type = NEW_ALLOC; 
 	for (int i = 0; i < THREAD_NUM; i++) {
-		ret = pthread_create(&t[i], NULL, alloc_func, (void *)&mempool_alloc);
+		ret = pthread_create(&t[i], NULL, alloc_func, (void *)&alloc_type);
 		if (ret != 0) {
 			printf("thread-%d create failed\n", i);
 			return ret;
@@ -107,11 +132,12 @@ int main() {
 	}
 	
 	printf("sleep 5sec \n");
-	sleep(5);	
+	sleep(1);	
 	
-	printf("---test new---\n");
+	printf("---test boostpool---\n");
+	alloc_type = BOOSTPOOL_ALLOC; 
 	for (int i = 0; i < THREAD_NUM; i++) {
-		ret = pthread_create(&t[i], NULL, alloc_func, (void *)&new_alloc);
+		ret = pthread_create(&t[i], NULL, alloc_func, (void *)&alloc_type);
 		if (ret != 0) {
 			printf("thread1 init failed\n");
 			return ret;
@@ -122,6 +148,24 @@ int main() {
 		pthread_join(t[i], NULL);
 	}
 	
+	printf("sleep 5sec \n");
+	sleep(1);	
+	#if 1
+	printf("---test mytpool---\n");
+	alloc_type = MYTPOOL_ALLOC; 
+	for (int i = 0; i < THREAD_NUM; i++) {
+		ret = pthread_create(&t[i], NULL, alloc_func, (void *)&alloc_type);
+		if (ret != 0) {
+			printf("thread1 init failed\n");
+			return ret;
+		}
+	}
+	
+	for (int i = 0; i < THREAD_NUM; i++) {
+		pthread_join(t[i], NULL);
+	}
+	#endif
+
 	return 0;
 }
 	

@@ -56,6 +56,9 @@ extern u64 opid;
 #define CHUNKSIZE 4096
 #define EPOLLSIZE 1024
 
+#define MEMPOOL_UNIT_NUMER_SHIFT 15
+#define MEMPOOL_UNIT_NUMER (1 << MEMPOOL_UNIT_NUMER_SHIFT)
+
 using namespace std;
 //using namespace wp::Pipe;
 //using namespace pdcPipe::PdcPipe;
