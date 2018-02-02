@@ -52,6 +52,7 @@ extern u64 opid;
 
 #define SERVER_IO_BLACKHOLE 1
 
+#define DIRECT_ACK 1
 #define MULTIPIPE 1
 #define CHUNKSIZE 4096
 #define EPOLLSIZE 1024

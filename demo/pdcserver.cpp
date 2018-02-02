@@ -9,6 +9,33 @@
 
 Pdcserver*pdc_server_mgr;
 
+int GetMemory(Pdcserver *pdc, Msginfo *msg)
+{
+    int r;
+    CephBackend::RbdVolume *vol;
+    pdcPipe::PdcPipe<Msginfo>::ptr pipe;
+
+    pdc->OpFindClient(msg);
+    r = pdc->getshm(msg->data.len, msg->data.indexlist);
+    if(r <= 0){
+        cerr<<"get memory failed"<<endl;
+        //TODO : need more todo
+       return r;
+    }
+    msg->data.chunksize = r;
+    msg->opcode = ACK_MEMORY;
+    vol = reinterpret_cast<CephBackend::RbdVolume *>(msg->volume);
+    pipe =reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(vol->mq[SENDMQ]);
+    assert(pipe);
+    r = pipe->push(msg);
+    if(r < 0){
+        msg->dump("push failed");
+        cerr<<"pipe push msg:"<<msg->opid<<" failed"<<endl;
+        return r;
+    }
+
+    return 0;
+}
 
 
 void pdc_callback(rbd_completion_t cb, void *arg)
@@ -219,10 +246,11 @@ void* Pdcserver::Iothreads::_process()
 }
 
 
+
 int handle_listen_events(Pdcserver *pdc, Msginfo* op)
 {
     static u64 sum =0;
-
+    int r;
         if(op)
             op->dump("listen thread get op");
         switch(op->opcode){
@@ -242,11 +270,17 @@ int handle_listen_events(Pdcserver *pdc, Msginfo* op)
             
             break;
         case GET_MEMORY:
-            pdc->msglock.lock();
-            pdc->msgop.push_back(op);
-            pdc->msgcond.Signal();
-            pdc->msglock.unlock();
-            	
+            if(DIRECT_ACK){
+                r = GetMemory(pdc,op);
+                if(r < 0 ){
+                    cerr<<"get memory failed:"<<r <<endl;
+                }
+            }else{
+                pdc->msglock.lock();
+                pdc->msgop.push_back(op);
+                pdc->msgcond.Signal();
+                pdc->msglock.unlock();
+            }
             break;
         default:  //mgr cmd
             pdc->msglock.lock();
@@ -360,15 +394,16 @@ void* Pdcserver::Finisherthreads::_process()
             if(( tfd == listenfd )&& (events[n].events & EPOLLIN)){  //
                 if(op->opcode == PDC_ADD_EPOLL){ // MULTI model to add epoll listen
                     op->dump("pdc add epoll");
-                    if(MULTIPIPE)
+                    if(MULTIPIPE){
                        add_event(pdc, epfd, ev, op, 0);
+                    }
                     curfds++;
-                       //ev.data.fd = ;
+                     //ev.data.fd = ;
                     //delete op;
                     pdc->msg_pool.free(op);
                 }else{
                   if(r == bufsize){
-					   op->init_after_read();
+                       op->init_after_read();
                        r = handle_listen_events(server,op);
                   }else{
                        cerr<<"msg pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
@@ -397,7 +432,6 @@ void* Pdcserver::Finisherthreads::_process()
 return 0;
 
 }
-
 
 void* Pdcserver::Msgthreads::_process()
 {
@@ -553,6 +587,10 @@ int Pdcserver::init()
     
     cerr<<"pdcserver init over"<<endl;
     return 0;
+}
+int Pdcserver::getshm(u32 size, u64* sum)
+{
+    return slab.get( size, sum);
 }
 
 int Pdcserver::register_connection(Msginfo* msg)

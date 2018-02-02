@@ -260,7 +260,7 @@ public:
                         return 0;
                     }
                     else {
-                        return r;
+                        return -1;
                     }
 			}
 			
