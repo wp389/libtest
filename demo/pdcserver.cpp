@@ -416,7 +416,7 @@ void* Pdcserver::Finisherthreads::_process()
                     r = handle_listen_events(server,op);
                 }else{
                     // need  delete ?
-                    cerr<<"muliti pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
+                    //cerr<<"muliti pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
                     if(tfd != listenfd)
                         del_event(epfd, tfd);
                     else{
