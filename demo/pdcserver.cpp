@@ -417,7 +417,12 @@ void* Pdcserver::Finisherthreads::_process()
                 }else{
                     // need  delete ?
                     cerr<<"muliti pipe read buf  is:"<<r<<" but should be:"<<bufsize<<endl;
-                    del_event(epfd, tfd);
+                    if(tfd != listenfd)
+                        del_event(epfd, tfd);
+                    else{
+                    /*all client is shutdown ,to free cpu*/
+                        usleep(100);
+                    }
                     pdc->msg_pool.free(op);
                 }
                 //cerr<<" fds:"<<fds <<" now is:"<<n<<" fd :"<<tfd<<endl;
