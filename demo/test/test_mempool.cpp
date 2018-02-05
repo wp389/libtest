@@ -9,8 +9,8 @@
 using namespace std;
 
 #define THREAD_NUM 2
-#define TEST_TIMES 1000
-#define ALLOC_NUM 50000
+#define TEST_TIMES 10000
+#define ALLOC_NUM 10000
 #define ALLOC_SIZE 100
 #define US_PER_SEC 1000000ul
 #define MS_PER_SEC 1000
