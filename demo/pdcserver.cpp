@@ -593,11 +593,12 @@ int Pdcserver::init()
     cerr<<"pdcserver init over"<<endl;
     return 0;
 }
+/*
 int Pdcserver::getshm(u32 size, u64* sum)
 {
     return slab.get( size, sum);
 }
-
+*/
 int Pdcserver::register_connection(Msginfo* msg)
 {
     //msg->dump();
