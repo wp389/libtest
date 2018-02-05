@@ -87,7 +87,7 @@ public:
 		return (T *)&pool[unit_idx];
 	}
 	
-	inline void free(void *addr) {
+	inline void free(void * const addr) {
 		assert(is_from(addr));
 		idx_type unit_idx = ((u64)addr - (u64)pool_start) / unit_size;
 		assert(unit_idx < num_unit);
@@ -98,9 +98,9 @@ public:
 		pthread_mutex_unlock(&lock);
 	}
 	
-	inline bool is_from(void *addr) {
-		return ((char *)addr >= pool_start && (char *)addr <= pool_end);
-			    ((unit_size % ((u64)addr + unit_size - (u64)pool_start)) == 0);
+	inline bool is_from(void * const addr) const {
+		return ((char *)addr >= pool_start && (char *)addr <= pool_end) && 
+			    ((((u64)addr - (u64)pool_start) % unit_size) == 0);
 	}
 
 	u32 get_unit_size() const {
