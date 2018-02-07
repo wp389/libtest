@@ -33,7 +33,7 @@ class Pdcserver :public Center{
     //list<PdcOp> queue_io;
     list<Msginfo> queue_ms;
     Perfs *performace;
-    ShmMem<simpledata> slab;
+    ShmMem slab;
     map<string,CephBackend *> clusters;
 	
 public:

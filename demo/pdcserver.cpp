@@ -97,10 +97,12 @@ void pdc_callback(rbd_completion_t cb, void *arg)
                 
                 for(int i = 0;i < op->data.chunksize;i++){
                 //memset(op->data.pdata, 6, op->data.len);
-                simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
+                //simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
+                char *pdata = (char *)pdc->slab.getaddbyindex(op->data.indexlist[i]);
                 //TODO: WRITE
-                lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-                ::memcpy((char *)pdata, buf+ pos,  lengh);
+                //lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
+                lengh = bufsize;
+                ::memcpy((char *)pdata, buf + pos,  lengh);
                 bufsize -= lengh;
                 pos += lengh;
                 }
@@ -204,10 +206,12 @@ void* Pdcserver::Iothreads::_process()
         vol->do_create_rbd_completion(op, &comp);
         for(int i = 0;i < op->data.chunksize;i++){
             //memset(op->data.pdata, 6, op->data.len);
-            simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
+            char *pdata = (char *)pdc->slab.getaddbyindex(op->data.indexlist[i]);
             //TODO: WRITE
-            lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-            vol->do_aio_write(op, off+ i*CHUNKSIZE, lengh, (char *)pdata, comp);   
+            //lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
+            lengh = bufsize;
+            //vol->do_aio_write(op, off+ i*CHUNKSIZE, lengh, (char *)pdata, comp);   
+            vol->do_aio_write(op, off, lengh, (char *)pdata, comp);   
             bufsize -= lengh;
         }
         }else {
@@ -499,6 +503,7 @@ void* Pdcserver::Msgthreads::_process()
             {
                 pdc->OpFindClient(msg);
                 r = pdc->slab.get(msg->data.len, msg->data.indexlist);
+				//cerr << "index: " << msg->data.indexlist[0] << endl;
                 if(r <= 0){
                     cerr<<"get memory failed"<<endl;
 					//TODO : need more todo
