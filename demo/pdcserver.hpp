@@ -74,6 +74,9 @@ public:
     list<Msginfo *> ops;
     Iothreads  *iothread;
 
+    int listennum;
+    int lastthread;
+    list<int> fds;
     PdcCond listencond;
     PdcLock listenlock;
     list<Msginfo *> finishop;
@@ -101,11 +104,10 @@ public:
     ~Pdcserver();
     void do_work(Pdcserver *server);
     int init();
-	
     int getshm(u32 size, u64* sum){
         return slab.get( size, sum);
+
     }
-	
     void OpFindClient(Msginfo *&op);
     int register_vm(map<string,string > &client, Msginfo *msg);
     int unregister();
@@ -113,7 +115,7 @@ public:
     int release_shmkey(Msginfo *op )
     {
         int n;
-        vector<u64> mems(op->data.indexlist,op->data.indexlist+ op->data.chunksize);
+        vector<u64> mems(op->u.data.indexlist,op->u.data.indexlist+ op->u.data.chunksize);
         n = slab.put(mems);
         //r = slab.put(indexlist);
         //cerr<<"free usedlist :"<<r<<endl;

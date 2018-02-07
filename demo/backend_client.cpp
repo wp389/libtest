@@ -46,20 +46,17 @@ int BackendClient::RbdVolume::aio_write(u64 offset, size_t len,const char *buf,
     
     //msg->getopid();
     msg->opcode = PDC_AIO_PREWRITE;
-    strcpy(msg->client.pool, prbd->rados->GetName());
-    strcpy(msg->client.volume, prbd->rbdname.c_str());
+    strcpy(msg->u.mgr.client.pool, prbd->rados->GetName());
+    strcpy(msg->u.mgr.client.volume, prbd->rbdname.c_str());
     msg->originbuf = buf;
-    msg->data.offset = offset;
-    msg->data.len = len;
-    msg->data.c = (void *)c;
-    //op->volume = (void *)prbd;
+    msg->u.data.offset = offset;
+    msg->u.data.len = len;
+    msg->u.data.c = (void *)c;
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio write");
 
     /*add request to completion*/
     c->add_request();
-    //prbd->enqueuefn(msg);
-
     pthread_mutex_lock(prbd->rados->ceph->_mutex);
     prbd->rados->ceph->_queue->push_back(msg);
     pthread_mutex_unlock(prbd->rados->ceph->_mutex);
@@ -77,13 +74,12 @@ int BackendClient::RbdVolume::aio_read(u64 offset, size_t len,const char *buf, P
     msg->default_init();
     //msg->getopid();
     msg->opcode = PDC_AIO_READ;
-    strcpy(msg->client.pool, prbd->rados->GetName());
-    strcpy(msg->client.volume, prbd->rbdname.c_str());
+    strcpy(msg->u.mgr.client.pool, prbd->rados->GetName());
+    strcpy(msg->u.mgr.client.volume, prbd->rbdname.c_str());
     msg->originbuf = buf;
-    msg->data.offset = offset;
-    msg->data.len = len;
-    msg->data.c = (void *)c;
-    //op->volume = (void *)prbd;
+    msg->u.data.offset = offset;
+    msg->u.data.len = len;
+    msg->u.data.c = (void *)c;
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio read");
     

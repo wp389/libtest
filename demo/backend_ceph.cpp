@@ -110,8 +110,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
         assert(0);
         return -1;
     }
-    //msg->dump("register_client");
-    //cerr<<"vmclient:"<<vmclient.size()<<" radoses:"<<radoses.size()<<endl;
+	
     map<string ,string>::iterator it = vmclient.begin();
     map<string, RadosClient*>::iterator itm = radoses.find(it->first);
     if(itm  != radoses.end()){
@@ -122,7 +121,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
             //update matedata or pipe
             //TODO:
             CephBackend::RbdVolume * rbd = reinterpret_cast<CephBackend::RbdVolume *>(p_rados->volumes[it->second]);
-            r = pdcPipe::updateserverqueues((void *)&msg->mqkeys,rbd->mq);
+            r = pdcPipe::updateserverqueues((void *)&msg->u.mgr.mqkeys,rbd->mq);
             if(r < 0){
                 cerr<<"update server queues failed"<<endl;
                 return r;
@@ -134,7 +133,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
             CephBackend::RbdVolume * rbd = new CephBackend::RbdVolume(it->second,itm->second);
             if(rbd->init(1) < 0) return -1;
             
-            r = pdcPipe::createserverqueues((void *)&msg->mqkeys,rbd->mq);
+            r = pdcPipe::createserverqueues((void *)&msg->u.mgr.mqkeys,rbd->mq);
             if(r < 0){
                 cerr<<"create server queues failed"<<endl;
                 return r;
@@ -152,7 +151,7 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
         CephBackend::RbdVolume * rbd = new CephBackend::RbdVolume(it->second,rados);
         if(rbd->init(1) < 0) return -1;
         
-        r = pdcPipe::createserverqueues((void *)&msg->mqkeys,rbd->mq);
+        r = pdcPipe::createserverqueues((void *)&msg->u.mgr.mqkeys,rbd->mq);
         if(r < 0){
             cerr<<"create server queues failed"<<endl;
             return r;
@@ -163,6 +162,21 @@ int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
 
 	
 return 0;
+}
+
+void* CephBackend::findclientnew(string &rados, string &rbd)
+{
+    void * vol;
+    map<string, RadosClient*>::iterator itm = radoses.find(rados);
+
+    if(itm  != radoses.end()){
+        RadosClient *r_volumes = itm->second;
+        if(r_volumes->volumes.find(rbd)  != r_volumes->volumes.end()){
+            vol = r_volumes->volumes[rbd];
+            return (void*)vol;
+        }
+    }
+    return NULL;
 }
 
 void* CephBackend::findclient(map<string, string> *opclient)
@@ -180,34 +194,6 @@ void* CephBackend::findclient(map<string, string> *opclient)
     }
     return NULL;
 }
-
-
-
-/* add by chenxuewei394 */
-void *CephBackend::findclient(string pool_name, string vol_name)
-{    
-    void * vol;
-    map<string, RadosClient*>::iterator it = radoses.find(pool_name);
-
-	if (it != radoses.end())
-	{
-        RadosClient *r_volumes = it->second;
-		
-        if(r_volumes->volumes.find(vol_name)  != r_volumes->volumes.end())
-		{
-            vol = r_volumes->volumes[vol_name];
-            return (void*)vol;
-        }
-		
-	}
-
-	return NULL;
-	
-}
-/* add by chenxuewei394 */
-
-
-
 CephBackend::CephBackend(string nm,string _conf, list<Msginfo *>*msgop):
     name(nm),_confpath(_conf),_queue(msgop)
 {

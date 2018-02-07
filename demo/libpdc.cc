@@ -90,17 +90,17 @@ extern "C" int rados_ioctx_create(rados_t vmclient, const char *pool_name,
             
         Msginfo *msg = new Msginfo();
         msg->opcode = OPEN_RADOS;
-        strcpy(msg->client.cluster,"ceph");
-        strcpy(msg->client.pool,pool_name);
+        strcpy(msg->u.mgr.client.cluster,"ceph");
+        strcpy(msg->u.mgr.client.pool,pool_name);
     
-        strcpy(msg->mqkeys.key , pclient->ackmq->Getkeys());
-        msg->mqkeys.semkey = pclient->ackmq->GetSemKey();
+        strcpy(msg->u.mgr.mqkeys.key , pclient->ackmq->Getkeys());
+        msg->u.mgr.mqkeys.semkey = pclient->ackmq->GetSemKey();
         if(MULTIPIPE){
-            strcpy(msg->mqkeys.recvkey, pclient->sendmq->Getkeys());
-            msg->mqkeys.recvsem = pclient->sendmq->GetSemKey();  //client's send is server's recv
+            strcpy(msg->u.mgr.mqkeys.recvkey, pclient->sendmq->Getkeys());
+            msg->u.mgr.mqkeys.recvsem = pclient->sendmq->GetSemKey();  //client's send is server's recv
         }else{
-            strcpy(msg->mqkeys.recvkey, pclient->msgmq.Getkeys());
-            msg->mqkeys.recvsem = pclient->msgmq.GetSemKey();  //client's send is server's recv
+            strcpy(msg->u.mgr.mqkeys.recvkey, pclient->msgmq.Getkeys());
+            msg->u.mgr.mqkeys.recvsem = pclient->msgmq.GetSemKey();  //client's send is server's recv
         }
         msg->dump("open rados");
         r = pclient->msgmq.push(msg);
@@ -185,16 +185,16 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
     Msginfo *msg = new Msginfo();
     msg->opcode = OPEN_RBD;
     
-    strcpy(msg->client.cluster,"ceph");
-    strcpy(msg->client.pool, prados->GetName());
-    strcpy(msg->client.volume,rbd_name);
+    strcpy(msg->u.mgr.client.cluster,"ceph");
+    strcpy(msg->u.mgr.client.pool, prados->GetName());
+    strcpy(msg->u.mgr.client.volume,rbd_name);
     // init client recvmq : server sendmq
-    strcpy(msg->mqkeys.key,recvmq->Getkeys());  //client recv pipe
-    msg->mqkeys.semkey = recvmq->GetSemKey();
+    strcpy(msg->u.mgr.mqkeys.key,recvmq->Getkeys());  //client recv pipe
+    msg->u.mgr.mqkeys.semkey = recvmq->GetSemKey();
 
     //init client sendmq : server recvmq
-    strcpy(msg->mqkeys.recvkey,sendmq->Getkeys());  //client send pipe
-    msg->mqkeys.recvsem= sendmq->GetSemKey();
+    strcpy(msg->u.mgr.mqkeys.recvkey,sendmq->Getkeys());  //client send pipe
+    msg->u.mgr.mqkeys.recvsem= sendmq->GetSemKey();
     msg->dump("open rbd");
 
     //if(!MULTIPIPE)
@@ -225,9 +225,9 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
         Msginfo *msg = new Msginfo();
         msg->opcode = PDC_ADD_EPOLL;
     
-        strcpy(msg->client.cluster,"ceph");
-        strcpy(msg->client.pool, prados->GetName());
-        strcpy(msg->client.volume,rbd_name);
+        strcpy(msg->u.mgr.client.cluster,"ceph");
+        strcpy(msg->u.mgr.client.pool, prados->GetName());
+        strcpy(msg->u.mgr.client.volume,rbd_name);
         p_pipe = &pdcclient->msgmq;   // use public to send register info
         r = p_pipe->push(msg);
         delete msg;

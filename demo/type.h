@@ -52,6 +52,7 @@ extern u64 opid;
 
 #define SERVER_IO_BLACKHOLE 1
 
+#define SHARD_LISTEN 1
 #define DIRECT_ACK 0
 #define MULTIPIPE 1
 #define CHUNKSIZE 4096
@@ -92,6 +93,7 @@ class Threadpool{
     int index;
     int size;
     map<int ,pthread_t>threads;
+    list<void *>queue;
     
 public:
     pthread_mutex_t mutex;
@@ -112,7 +114,7 @@ public:
 	 }
         */
     }
-    
+    void setname(string nm) {name.assign(nm);}
     void join(){
         map<int, pthread_t>::iterator it;
         for(it = threads.begin();it!= threads.end();it++){
@@ -120,6 +122,13 @@ public:
             cerr<< "thread:"<<name<<" ["<<it->first<<"] stoped"<<endl;
 	 }
     }
+	/*
+    void _enq(void *q) {queue.push_back(q);}
+    void * _deq(){ 
+         void *tmp;
+         if()
+		 queue.pop}
+    */
     bool stop() {return _stop;}
     bool shutdown() {return false;}
 protected:
@@ -266,7 +275,12 @@ struct pipekey{
     int semkey;
     char recvkey[NAMELENTH];
     int recvsem;
-    pipekey() {};
+    //pipekey() {};
+};
+
+struct mgrmsg{
+    struct pipekey mqkeys;
+    struct PdcClientInfo client;
 };
 struct  Msginfo{
     bool sw;
@@ -274,12 +288,12 @@ struct  Msginfo{
     pid_t pid;
     pid_t remote_pid;
     int ref;
-    pipekey mqkeys;
-    
+ 
     PdcIomachine opcode;  //opcode
-    
-    PdcClientInfo client;
-    pdcdata data;
+    union {
+        mgrmsg mgr; 
+        pdcdata data;
+    } u;
     const void * originbuf;
     
     void * op;			//
@@ -287,7 +301,7 @@ struct  Msginfo{
     int return_code;
     void *slab;
 	
-    Msginfo():sw(false),opid(0),remote_pid(0),return_code(0),ref(0) {pid = getpid(); };
+    Msginfo():sw(false),opid(0),remote_pid(0),return_code(0),ref(0) {pid = getpid(); }
 	/*init some member,just like the default construction function*/
 	void default_init() {
 		sw = false;
@@ -311,15 +325,15 @@ struct  Msginfo{
     int copy(Msginfo *m){
         if(m){
             this->opcode = m->opcode;
-            this->client = m->client;
+            this->u.mgr.client = m->u.mgr.client;
             this->remote_pid = m->pid;
-            this->data = m->data;
+            this->u.data = m->u.data;
             this->originbuf = m->originbuf;
             this->op = m->op;
             this->opid = m->opid;
             //copy pipe keys:
-            ::memcpy(this->mqkeys.key, m->mqkeys.key, sizeof(m->mqkeys.key));
-            this->mqkeys.semkey = m->mqkeys.semkey;
+            ::memcpy(this->u.mgr.mqkeys.key, m->u.mgr.mqkeys.key, sizeof(m->u.mgr.mqkeys.key));
+            this->u.mgr.mqkeys.semkey = m->u.mgr.mqkeys.semkey;
             //this->volume = m->volume;   
             this->return_code = m->return_code;
         }
@@ -330,14 +344,16 @@ struct  Msginfo{
             
             //this->mqkeys.swap(m->mqkeys);
             this->opcode = m->opcode;
-            this->client = m->client;
-            this->data = m->data;
+            this->u.mgr.client = m->u.mgr.client;
+            this->u.data = m->u.data;
             this->op = m->op;
             this->remote_pid = m->pid;
             //memset(m , 0 ,);
         }
         return *this;
     }
+    void enabledump() {sw = true;}
+    void disabledump() {sw = false;}
     void dump(const char *f =NULL){
         struct timeval time;
         if(!sw) return;
@@ -351,24 +367,24 @@ struct  Msginfo{
         cerr<<" ,opid = "<<opid;
         cerr<<" ,pid ="<<pid;
         cerr<<" ,op = "<<opcode;
-        cerr<<" ,client.pool ="<<client.pool;
-        cerr<<" ,client.rbd ="<<client.volume;
+        cerr<<" ,client.pool ="<<u.mgr.client.pool;
+        cerr<<" ,client.rbd ="<<u.mgr.client.volume;
         //cerr<<" ,client.pipekey ="<<client.pipekey;
-        cerr<<" ,offset ="<<data.offset;
-        cerr<<" ,len ="<<data.len;
+        cerr<<" ,offset ="<<u.data.offset;
+        cerr<<" ,len ="<<u.data.len;
 
         if(1){
-            cerr<<" ,pipe recv keys:"<<mqkeys.key;
-            cerr<<" ,sem recv keys:"<<mqkeys.semkey;
-            cerr<<" ,pipe send keys:"<<mqkeys.recvkey;
-            cerr<<" ,sem send keys:"<<mqkeys.recvsem;
+            cerr<<" ,pipe recv keys:"<<u.mgr.mqkeys.key;
+            cerr<<" ,sem recv keys:"<<u.mgr.mqkeys.semkey;
+            cerr<<" ,pipe send keys:"<<u.mgr.mqkeys.recvkey;
+            cerr<<" ,sem send keys:"<<u.mgr.mqkeys.recvsem;
 
         }
 
-        if(data.chunksize > 0){
+        if(u.data.chunksize > 0){
             //vector<u64>::iterator it;
-            cerr<<" ,indexlist.size:"<<data.chunksize<<" :";
-            for(int i = 0;i < data.chunksize;i++){
+            cerr<<" ,indexlist.size:"<<u.data.chunksize<<" :";
+            for(int i = 0;i < u.data.chunksize;i++){
                 cerr<<" "<<i;
             }
 

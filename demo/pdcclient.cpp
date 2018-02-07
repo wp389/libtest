@@ -49,12 +49,12 @@ void* PdcClient::Iothreads::_process()
             assert(0);
             continue;
             }
-            u64 bufsize = msg->data.len;
+            u64 bufsize = msg->u.data.len;
             char * buf = (char *)msg->originbuf;
-            for(int i = 0;i < msg->data.chunksize;i++){
+            for(int i = 0;i < msg->u.data.chunksize;i++){
                 u64 size = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
                 
-                simpledata * pdata = pdc->slab.getaddbyindex(msg->data.indexlist[i]);
+                simpledata * pdata = pdc->slab.getaddbyindex(msg->u.data.indexlist[i]);
                 //TODO: WRITE
                 ::memcpy(pdata, &(buf[i*CHUNKSIZE]), size);
                 bufsize -= CHUNKSIZE;
@@ -97,7 +97,7 @@ void* PdcClient::Finisherthreads::_process()
         assert(msg != NULL);
         r = p_pipe->pop(msg);
         if(0 != r){
-		    cerr<<"pop size is:"<<r<<endl;
+		    //cerr<<"pop size is:"<<r<<endl;
 			pdc->msg_pool.free(msg);
 			continue;
         }
@@ -128,6 +128,9 @@ void* PdcClient::Finisherthreads::_process()
                 break;
              default:
                 cerr<<"finish op:"<<msg->opcode<<endl;
+                msg->enabledump();
+                msg->dump("get error code ");
+                msg->disabledump();
                 assert(0);
                 break;
         }
@@ -181,7 +184,7 @@ void* PdcClient::Msgthreads::_process()
         if(msg){
             msg->dump("client msg tp op");
             std::map<string,string> client;
-            client[msg->client.pool] = msg->client.volume;
+            client[msg->u.mgr.client.pool] = msg->u.mgr.client.volume;
             //perf.inc();
             //prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume()); 
             
@@ -217,11 +220,11 @@ void* PdcClient::Msgthreads::_process()
                     break;
                 }
                 */
-                bufsize = msg->data.len;
+                bufsize = msg->u.data.len;
                 buf = (char *)msg->originbuf;
-                for(int i = 0;i < msg->data.chunksize;i++){
+                for(int i = 0;i < msg->u.data.chunksize;i++){
                     size = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-                    pdata = pdc->slab.getaddbyindex(msg->data.indexlist[i]);
+                    pdata = pdc->slab.getaddbyindex(msg->u.data.indexlist[i]);
                      //TODO: WRITE
                     ::memcpy(pdata, &(buf[i*CHUNKSIZE]), size);
                     //r = do_op(,pdata);
@@ -253,7 +256,7 @@ void* PdcClient::Msgthreads::_process()
             case RW_W_FINISH:
                 //assert(prbd);
                 //cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
-                c = reinterpret_cast<PdcCompletion*>(msg->data.c);
+                c = reinterpret_cast<PdcCompletion*>(msg->u.data.c);
                 if(c && c->callback){
                     ///c->callback(c->comp, c->callback_arg);
                     c->complete(msg->return_code);
@@ -262,7 +265,7 @@ void* PdcClient::Msgthreads::_process()
                 break;
              case RW_R_FINISH:
                 //cerr<<"read op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
-                c = reinterpret_cast<PdcCompletion*>(msg->data.c);
+                c = reinterpret_cast<PdcCompletion*>(msg->u.data.c);
                 if(c && c->callback){
                     ///c->callback(c->comp, c->callback_arg);
                     c->complete(msg->return_code);
@@ -303,7 +306,7 @@ return NULL;
 
 int PdcClient::init()
 {
-    int ret;
+    int ret ;
     int r;
     int i;
     pthread_t id;
@@ -367,8 +370,8 @@ int PdcClient::init()
 
 void PdcClient::OpFindClient(Msginfo *&op)
 {
-    string pool(op->client.pool);
-    string volume(op->client.volume);
+    string pool(op->u.mgr.client.pool);
+    string volume(op->u.mgr.client.volume);
     map<string,string> opclient;
     opclient[pool] = volume;
     string backendname("ceph");
@@ -393,12 +396,12 @@ int PdcClient::aio_write(BackendClient::RbdVolume *prbd, u64 offset, size_t len,
     
     //msg->getopid();
     msg->opcode = PDC_AIO_PREWRITE;
-    strcpy(msg->client.pool, prbd->rados->GetName());
-    strcpy(msg->client.volume, prbd->GetName());
+    strcpy(msg->u.mgr.client.pool, prbd->rados->GetName());
+    strcpy(msg->u.mgr.client.volume, prbd->GetName());
     msg->originbuf = buf;
-    msg->data.offset = offset;
-    msg->data.len = len;
-    msg->data.c = (void *)c;
+    msg->u.data.offset = offset;
+    msg->u.data.len = len;
+    msg->u.data.c = (void *)c;
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio write");
 
@@ -417,12 +420,12 @@ int PdcClient::aio_read(BackendClient::RbdVolume *prbd, u64 offset, size_t len,c
     msg->default_init();
     //msg->getopid();
     msg->opcode = PDC_AIO_READ;
-    strcpy(msg->client.pool, prbd->rados->GetName());
-    strcpy(msg->client.volume, prbd->GetName());
+    strcpy(msg->u.mgr.client.pool, prbd->rados->GetName());
+    strcpy(msg->u.mgr.client.volume, prbd->GetName());
     msg->originbuf = buf;
-    msg->data.offset = offset;
-    msg->data.len = len;
-    msg->data.c = (void *)c;
+    msg->u.data.offset = offset;
+    msg->u.data.len = len;
+    msg->u.data.c = (void *)c;
     //op->volume = (void *)prbd;
     msg->insert_volume((void *)prbd);
     msg->dump("rbd aio read");
