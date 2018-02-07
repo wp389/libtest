@@ -593,10 +593,10 @@ int Pdcserver::init()
     cerr<<"pdcserver init over"<<endl;
     return 0;
 }
-int Pdcserver::getshm(u32 size, u64* sum)
-{
-    return slab.get( size, sum);
-}
+//int Pdcserver::getshm(u32 size, u64* sum)
+//{
+//    return slab.get( size, sum);
+//}
 
 int Pdcserver::register_connection(Msginfo* msg)
 {
@@ -633,12 +633,15 @@ int Pdcserver::register_vm(map<string,string > &client, Msginfo *msg)
 return 0;
 }
 
+/*
+    Modify by chenxuewei394
+*/
 void Pdcserver::OpFindClient(Msginfo *&op)
 {
-    string pool(op->client.pool);
-    string volume(op->client.volume);
-    map<string,string> opclient;
-    opclient[pool] = volume;
+    string pool_name(op->client.pool);
+    string vol_name(op->client.volume);
+    //map<string,string>::iterator it;
+    //opclient[pool_name] = vol_name;
     string backendname("ceph");
     CephBackend *backend = clusters[backendname];
     if(!backend){
@@ -646,9 +649,15 @@ void Pdcserver::OpFindClient(Msginfo *&op)
         assert(0);
         return;
     }
-    op->volume =  backend->findclient( &opclient);
-    assert(op->volume);
-    
+    op->volume =  backend->findclient(pool_name, vol_name);
+	if (NULL == op->volume)
+	{
+	    return;
+		assert(0);
+	}
+
+
+	return;
 }
 
 void Pdcserver::wait_to_shutdown()

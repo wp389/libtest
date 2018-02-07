@@ -13,7 +13,7 @@
 
 using namespace std;
 
-class CephBackend{
+class CephBackend {
     string name;
     string _confpath;
 public:
@@ -64,6 +64,7 @@ public:
     ~CephBackend();
     int register_client(map<string,string > &vmclient, Msginfo *msg);
     void *findclient(map<string, string> *opclient);
+	void *findclient(string pool_name, string vol_name);
 };
 
 

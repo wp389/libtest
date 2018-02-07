@@ -303,7 +303,7 @@ return NULL;
 
 int PdcClient::init()
 {
-    int ret ;
+    int ret;
     int r;
     int i;
     pthread_t id;

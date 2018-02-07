@@ -180,6 +180,34 @@ void* CephBackend::findclient(map<string, string> *opclient)
     }
     return NULL;
 }
+
+
+
+/* add by chenxuewei394 */
+void *CephBackend::findclient(string pool_name, string vol_name)
+{    
+    void * vol;
+    map<string, RadosClient*>::iterator it = radoses.find(pool_name);
+
+	if (it != radoses.end())
+	{
+        RadosClient *r_volumes = it->second;
+		
+        if(r_volumes->volumes.find(vol_name)  != r_volumes->volumes.end())
+		{
+            vol = r_volumes->volumes[vol_name];
+            return (void*)vol;
+        }
+		
+	}
+
+	return NULL;
+	
+}
+/* add by chenxuewei394 */
+
+
+
 CephBackend::CephBackend(string nm,string _conf, list<Msginfo *>*msgop):
     name(nm),_confpath(_conf),_queue(msgop)
 {
