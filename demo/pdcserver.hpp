@@ -101,10 +101,11 @@ public:
     ~Pdcserver();
     void do_work(Pdcserver *server);
     int init();
-    int getshm(u32 size, u64* sum)
-	{
-	    return slab.get( size, sum);
+	
+    int getshm(u32 size, u64* sum){
+        return slab.get( size, sum);
     }
+	
     void OpFindClient(Msginfo *&op);
     int register_vm(map<string,string > &client, Msginfo *msg);
     int unregister();
