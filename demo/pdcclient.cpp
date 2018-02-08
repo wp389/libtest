@@ -239,13 +239,9 @@ void* PdcClient::Msgthreads::_process()
                     unit_size = pdc->slab.get_unit_size(msg->data.indexlist[i]);
                     assert(unit_size != -1);
                     copy_size = bufsize > unit_size ? unit_size : bufsize;
-					//cerr << "index: " << msg->data.indexlist[i] << endl;
                     pdata = (char *)pdc->slab.getaddbyindex(msg->data.indexlist[i]);
                     assert(pdata != NULL);
-					//TODO: WRITE
-					//cout << std::hex << "pdata " << (u64)pdata << std::dec << endl;
-					//cout << "copy_loc " << copy_loc << endl;
-					//cout << "copy_size " << copy_size << endl;
+                    //TODO: WRITE
                     ::memcpy(pdata, buf + copy_loc, copy_size);
                     bufsize -= copy_size;
                     copy_loc += copy_size;

@@ -112,6 +112,7 @@ private:
     };
 
 
+#if 0
 static const uint32_t SHMSIZE = 1024*1024*1024;
 //测试将大小调小，实际使用时应该设大避免影响性能
 
@@ -131,7 +132,7 @@ public:
         
     }
 };
-
+#endif
 /*
 we split the whole share memory to several chunks, for example:
 
@@ -171,7 +172,28 @@ public:
     };
  
     struct ShmChunkDetail {
-		ShmChunkDetail():lock("shm_lock") {}
+        ShmChunkDetail():start_addr(NULL), end_addr(NULL),
+			idx_array(NULL),lock("shm_lock") {}
+        ~ShmChunkDetail() {
+            if (idx_array) {
+                ::free(idx_array);
+				idx_array = NULL;
+            }
+        }			
+        void dump() {
+            cout << "chunk_id: " << chunk_id;
+            cout << " start_addr: " << std::hex << (u64)start_addr;
+            cout << std::dec;
+            cout << " chunk_size: " << chunk_size;
+            cout << " alloc_cursor: " << alloc_cursor;
+            cout << " num_unit: " << num_unit;
+            cout << " min_unit_id: " << min_unit_id;
+            cout << " max_unit_id: " << max_unit_id;
+            cout << " num_free_unit: " << num_free_unit;
+            cout << " unit_size: " << unit_size;
+            cout << endl;
+        }
+		
         u32 chunk_id;
         char *start_addr;
         char *end_addr;
@@ -184,25 +206,11 @@ public:
         u32 num_free_unit;
         u32 unit_size;
         PdcLock lock;
-
-        void dump() {
-            cout << "chunk_id: " << chunk_id;
-            cout << " start_addr: " << std::hex << (u64)start_addr;
-			cout << std::dec;
-            cout << " chunk_size: " << chunk_size;
-            cout << " alloc_cursor: " << alloc_cursor;
-            cout << " num_unit: " << num_unit;
-            cout << " min_unit_id: " << min_unit_id;
-            cout << " max_unit_id: " << max_unit_id;
-            cout << " num_free_unit: " << num_free_unit;
-            cout << " unit_size: " << unit_size;
-            cout << endl;
-        }
     };
 	
 public:
     explicit ShmMem(int key,int iCreate=-1):m_pShm(NULL),m_iStatus(-1), m_iShmId(-1), 
-        m_key(key),m_iCreate(iCreate),usetype(0),lock("shmlock"){
+        m_key(key),m_iCreate(iCreate),lock("shmlock"){
         m_pShm = NULL;
         shm_size = 0;
         alloc_policy = ALLOC_POLICY_SINGLE_UNIT;
@@ -225,12 +233,15 @@ public:
         }
     }
     int Init(){
+        int ret;
+		#if 0
         int ret = m_Sem.Init(m_key);
         if (ret < 0) {
             m_sErrMsg.clear();
             m_sErrMsg = m_Sem.GetErrMsg();
             return ret;
         }
+		#endif
         /*get share memroy size*/
         for (int i = 0; i < num_chunk; i++) {
             shm_size += chunk_size[i].chunk_size;
@@ -447,16 +458,16 @@ public:
         return m_sErrMsg;
     }
 private:
-    SuperBlock*sb;
-    int usetype;
+    //SuperBlock*sb;
+    //int usetype;
     char *m_pShm;
     int m_iShmId;
     int m_iStatus;
     int m_iCreate;
     int m_key;
-    char *pdata;
+    //char *pdata;
     //T *pmem;
-    SemLock m_Sem;
+    //SemLock m_Sem;
     PdcLock lock;
     std::string m_sErrMsg;
 

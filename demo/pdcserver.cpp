@@ -155,7 +155,8 @@ void* Pdcserver::Iothreads::_process()
     u64 sum =0;
     u64 off = 0;
     u32 bufsize = 0;
-    u32 lengh;
+    u32 write_lengh;
+    int unit_size;
     char *buf;
     static bool flag = false;
     Pdcserver *pdc = (Pdcserver *)server;
@@ -197,36 +198,36 @@ void* Pdcserver::Iothreads::_process()
         switch(op->opcode){
         // aio write
         case PDC_AIO_WRITE:
-        if(!SERVER_IO_BLACKHOLE){
-        //rbd_completion_t comp;
-        off = op->data.offset;
-        bufsize = op->data.len;
-        lengh;
-        flag = false;
-        vol->do_create_rbd_completion(op, &comp);
-        for(int i = 0;i < op->data.chunksize;i++){
-            //memset(op->data.pdata, 6, op->data.len);
-            char *pdata = (char *)pdc->slab.getaddbyindex(op->data.indexlist[i]);
-            //TODO: WRITE
-            //lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-            lengh = bufsize;
-            //vol->do_aio_write(op, off+ i*CHUNKSIZE, lengh, (char *)pdata, comp);   
-            vol->do_aio_write(op, off, lengh, (char *)pdata, comp);   
-            bufsize -= lengh;
-        }
-        }else {
-            op->ref_inc();
-            pdc_callback(NULL, op);
-            //continue;
-        }
-        break;
+            if (!SERVER_IO_BLACKHOLE) {
+                off = op->data.offset;
+                bufsize = op->data.len;
+                flag = false;
+                vol->do_create_rbd_completion(op, &comp);
+                /*TODO:deal with muti index,
+                           when multi aio write is done,we call function pdc_callback*/
+                for (int i = 0; i < op->data.chunksize; i++) {            
+                    assert(bufsize > 0);
+                    unit_size = pdc->slab.get_unit_size(op->data.indexlist[i]);
+                    assert(unit_size != -1);
+                    char *pdata = (char *)pdc->slab.getaddbyindex(op->data.indexlist[i]);
+                    assert(pdata != NULL);
+                    write_lengh = bufsize > unit_size ? unit_size : bufsize;
+                    vol->do_aio_write(op, off, write_lengh, (char *)pdata, comp);   
+                    bufsize -= write_lengh;
+                    off += write_lengh;
+                }
+            } else {
+                op->ref_inc();
+                pdc_callback(NULL, op);
+               //continue;
+            }
+            break;
         // aio read
         case PDC_AIO_READ:
             //rbd_completion_t comp;
             
             off = op->data.offset;
             bufsize = op->data.len;
-            lengh = 0;
             //buf = NULL;
             buf = (char *)malloc(op->data.len);
             op->op = (void *)buf;
