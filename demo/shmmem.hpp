@@ -185,12 +185,12 @@ public:
             cout << " start_addr: " << std::hex << (u64)start_addr;
             cout << std::dec;
             cout << " chunk_size: " << chunk_size;
+            cout << " unit_size: " << unit_size;
             cout << " alloc_cursor: " << alloc_cursor;
-            cout << " num_unit: " << num_unit;
             cout << " min_unit_id: " << min_unit_id;
             cout << " max_unit_id: " << max_unit_id;
+            cout << " num_unit: " << num_unit;
             cout << " num_free_unit: " << num_free_unit;
-            cout << " unit_size: " << unit_size;
             cout << endl;
         }
 		
@@ -199,12 +199,12 @@ public:
         char *end_addr;
         idx_type *idx_array;
         u32 chunk_size;
+        u32 unit_size;
         u32 alloc_cursor;
-        u32 num_unit;
         u32 min_unit_id;
         u32 max_unit_id;
+        u32 num_unit;
         u32 num_free_unit;
-        u32 unit_size;
         PdcLock lock;
     };
 	
