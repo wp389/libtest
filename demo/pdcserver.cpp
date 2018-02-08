@@ -155,8 +155,10 @@ void* Pdcserver::Iothreads::_process()
     u64 sum =0;
     u64 off = 0;
     u32 bufsize = 0;
-    u32 write_lengh;
+    u32 write_length;
+    u32 read_length;
     int unit_size;
+    int num_index = 0;
     char *buf;
     static bool flag = false;
     Pdcserver *pdc = (Pdcserver *)server;
@@ -198,47 +200,62 @@ void* Pdcserver::Iothreads::_process()
         switch(op->opcode){
         // aio write
         case PDC_AIO_WRITE:
+            flag = false;
             if (!SERVER_IO_BLACKHOLE) {
+                op->ref_add(op->u.data.chunksize);
                 off = op->u.data.offset;
                 bufsize = op->u.data.len;
-                flag = false;
-                vol->do_create_rbd_completion(op, &comp);
-                /*TODO:deal with muti index,
-                           when multi aio write is done,we call function pdc_callback*/
                 for (int i = 0; i < op->u.data.chunksize; i++) {            
                     assert(bufsize > 0);
                     unit_size = pdc->slab.get_unit_size(op->u.data.indexlist[i]);
                     assert(unit_size != -1);
-                    char *pdata = (char *)pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
+                    char *pdata = 
+                        (char *)pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
                     assert(pdata != NULL);
-                    write_lengh = bufsize > unit_size ? unit_size : bufsize;
-                    vol->do_aio_write(op, off, write_lengh, (char *)pdata, comp);   
-                    bufsize -= write_lengh;
-                    off += write_lengh;
+                    write_length = bufsize > unit_size ? unit_size : bufsize;
+					vol->do_create_rbd_completion(op, &comp);
+                    vol->do_aio_write(op, off, write_length, pdata, comp);   
+                    bufsize -= write_length;
+                    off += write_length;
                 }
             } else {
-                op->ref_inc();
+				op->ref_inc();
                 pdc_callback(NULL, op);
                //continue;
             }
             break;
         // aio read
         case PDC_AIO_READ:
-            //rbd_completion_t comp;
-            off = op->u.data.offset;
-            bufsize = op->u.data.len;
-            //buf = NULL;
-            buf = (char *)malloc(op->u.data.len);
-            op->op = (void *)buf;
-        if(!SERVER_IO_BLACKHOLE){
+            /*get share memory units*/
+            num_index = pdc->slab.get(op->u.data.len, op->u.data.indexlist);
+            if (num_index < 0 ) {
+                cerr << "failed to get shm unit,ret is " << num_index << endl;
+                //TODO:should we retry to get share memory unit,or just return failed?
+                break;
+            }
+            op->u.data.chunksize = num_index; 
             flag = false;
-            vol->do_create_rbd_completion(op, &comp);
-            vol->do_aio_read(op,  op->u.data.offset, op->u.data.len, buf, comp);   
-        }else{
-            op->ref_inc();
-            pdc_callback(NULL, op);
-
-        }
+            if (!SERVER_IO_BLACKHOLE) {
+                op->ref_add(num_index);
+                off = op->u.data.offset;
+                bufsize = op->u.data.len;
+                for (int i = 0; i < op->u.data.chunksize; i++) {
+                    assert(bufsize > 0);
+                    unit_size = pdc->slab.get_unit_size(op->u.data.indexlist[i]);
+                    assert(unit_size != -1);
+                    char *pdata = 
+                        (char *)pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
+                    assert(pdata != NULL);
+                    read_length = bufsize > unit_size ? unit_size : bufsize;
+                    vol->do_create_rbd_completion(op, &comp);
+                    vol->do_aio_read(op, off, read_length, pdata, comp);   
+                    bufsize -= read_length;
+					off += read_length;
+				}
+            } else {
+                op->ref_inc();
+                pdc_callback(NULL, op);
+            }
             break;		
         default:
             assert(0);
