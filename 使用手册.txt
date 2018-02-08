@@ -1,0 +1,45 @@
+1.编译工程。（注：编译环境上需要安装librbd和librados)
+#cd libtest/demo
+#./compile_dl.sh
+
+2.编译出的可执行程序以及库文件在obj目录下，
+需要拷贝server和libpdc.so.1.0.0至运行环境下。
+# ls obj/
+libpdc.so.1.0.0  server
+
+3.安装。（在运行环境上，在server和libpdc.so.1.0.0所在目录执行安装脚本）
+#./install_dl.sh
+
+安装完毕后，有关库软连接应该如下所示：
+# ll /lib64/librbd.so.1 
+lrwxrwxrwx. 1 root root 22 Feb  8 16:08 /lib64/librbd.so.1 -> /lib64/libpdc.so.1.0.0
+# ll /lib64/librados.so.2 
+lrwxrwxrwx. 1 root root 22 Feb  8 16:08 /lib64/librados.so.2 -> /lib64/libpdc.so.1.0.0
+# ll /lib64/pdc/librbd.so.1
+lrwxrwxrwx. 1 root root 26 Feb  8 16:08 /lib64/pdc/librbd.so.1 -> /lib64/pdc/librbd.so.1.0.0
+# ll /lib64/pdc/librados.so.2
+lrwxrwxrwx. 1 root root 28 Feb  8 16:08 /lib64/pdc/librados.so.2 -> /lib64/pdc/librados.so.2.0.0
+
+4.使用。
+目前只支持使用fio测试，需要重新编译fio使其支持rbd引擎。
+fio job文件中在需要配置使用rbd引擎，示例如下：
+#cat fio.job
+[global]
+ioengine=rbd
+clientname=admin
+pool=test-pool
+rbdname=test-img
+bs=4k
+size=10GB
+group_reporting=1
+runtime=600
+iodepth=32
+
+使用时，先执行server
+#./server
+
+再运行fio进行测试
+#fio fio.job
+
+5.卸载
+#./uninstall_dl.sh
