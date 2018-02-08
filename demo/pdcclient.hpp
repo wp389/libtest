@@ -45,7 +45,7 @@ public:
     //map<map<string, string>, PdcPipe<Msginfo>* > ackmq;
     //list<PdcOp> queue_io;
     Perfs *performace;
-    ShmMem<simpledata> slab;
+    ShmMem slab;
     map<string,BackendClient *> clusters;
 	MemPool<Msginfo> msg_pool;
     friend class BackendClient;

@@ -49,15 +49,24 @@ void* PdcClient::Iothreads::_process()
             assert(0);
             continue;
             }
+            u32 copy_loc = 0;
             u64 bufsize = msg->u.data.len;
-            char * buf = (char *)msg->originbuf;
-            for(int i = 0;i < msg->u.data.chunksize;i++){
-                u64 size = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-                
-                simpledata * pdata = pdc->slab.getaddbyindex(msg->u.data.indexlist[i]);
+            char *buf = (char *)msg->originbuf;
+            for(int i = 0;i < msg->u.data.chunksize; i++){
+                int unit_size;
+                u32 copy_size;
+                char *pdata;
+				
+                assert(bufsize > 0);
+                unit_size = pdc->slab.get_unit_size(msg->u.data.indexlist[i]);
+                assert(unit_size != -1);
+                copy_size = bufsize > unit_size ? unit_size : bufsize;                
+                pdata = (char *)pdc->slab.getaddbyindex(msg->u.data.indexlist[i]);
+                assert(pdata != NULL);
                 //TODO: WRITE
-                ::memcpy(pdata, &(buf[i*CHUNKSIZE]), size);
-                bufsize -= CHUNKSIZE;
+                ::memcpy(pdata, buf + copy_loc, copy_size);
+                bufsize -= copy_size;
+                copy_loc += copy_size;
             }
             p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
             r = p_pipe->push(msg);
@@ -147,6 +156,7 @@ void* PdcClient::Msgthreads::_process()
     int r;
     map<string , u64> sum;
     u64 bufsize, size;
+    u32 copy_loc = 0;
     char * buf;
     simpledata * pdata;
     pdcPipe::PdcPipe<Msginfo>::ptr p_pipe;
@@ -209,26 +219,25 @@ void* PdcClient::Msgthreads::_process()
                     msg->dump(" msg push failed" );
                 }
                 break;
-            case PDC_AIO_WRITE:
-                //pdc->OpFindClient(msg);
-                /*
-                prbd = reinterpret_cast<BackendClient::RbdVolume *>(msg->pop_volume());
-                if(!prbd){
-                    cerr<<"get NULL volume"<<endl;
-                     //delete op;
-                     assert(0);
-                    break;
-                }
-                */
+            case PDC_AIO_WRITE:  
+                copy_loc = 0;
                 bufsize = msg->u.data.len;
                 buf = (char *)msg->originbuf;
-                for(int i = 0;i < msg->u.data.chunksize;i++){
-                    size = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-                    pdata = pdc->slab.getaddbyindex(msg->u.data.indexlist[i]);
-                     //TODO: WRITE
-                    ::memcpy(pdata, &(buf[i*CHUNKSIZE]), size);
-                    //r = do_op(,pdata);
-                    bufsize -= CHUNKSIZE;
+                for (int i = 0;i < msg->u.data.chunksize; i++) {
+                    int unit_size;
+                    u32 copy_size;
+                    char *pdata;
+					
+                    assert(bufsize > 0);
+                    unit_size = pdc->slab.get_unit_size(msg->u.data.indexlist[i]);
+                    assert(unit_size != -1);
+                    copy_size = bufsize > unit_size ? unit_size : bufsize;
+                    pdata = (char *)pdc->slab.getaddbyindex(msg->u.data.indexlist[i]);
+                    assert(pdata != NULL);
+                    //TODO: WRITE
+                    ::memcpy(pdata, buf + copy_loc, copy_size);
+                    bufsize -= copy_size;
+                    copy_loc += copy_size;
                 }
                 p_pipe = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(pdc->mq[SENDMQ]);
                 r = p_pipe->push(msg);

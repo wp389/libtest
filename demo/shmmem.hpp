@@ -112,6 +112,7 @@ private:
     };
 
 
+#if 0
 static const uint32_t SHMSIZE = 1024*1024*1024;
 //测试将大小调小，实际使用时应该设大避免影响性能
 
@@ -131,32 +132,127 @@ public:
         
     }
 };
+#endif
+/*
+we split the whole share memory to several chunks, for example:
 
+           ----------------------------------------------------------------
+shm ->| chunk 512MB,32K unit | chunk 512MB,128K unit | chunk 512MB,512K unit  |
+           ----------------------------------------------------------------
 
-template<typename T>
+                         -------------------------------------------------------
+chunk(512MB) -> | 32k unit |32k unit |32k unit |32k unit |32k unit |...                |
+                         -------------------------------------------------------
+                         ^
+                          start_addr
+*/       
+#define SHM_SPLIT_CHUNK_NUM 3
+#define SHM_CHUNK_SIZE_512M (512 * 1024 * 1024)
+#define SHM_UNIT_SIZE_32K  (32 * 1024)
+#define SHM_UNIT_SIZE_128K  (128 * 1024)
+#define SHM_UNIT_SIZE_512K  (512 * 1024)
+
 class ShmMem {
 public:
+    typedef unsigned int idx_type;
+	
+    enum {
+        ALLOC_POLICY_SINGLE_UNIT = 0, 
+        ALLOC_POLICY_MULTI_UNIT	= 1,
+    };
+
+    enum {
+        SHM_USE_TYPE_CLIENT = 0,
+        SHM_USE_TYPE_SERVER = 1,
+    };
+	
+    struct ShmChunkSize {
+        u32 chunk_size;
+        u32 unit_size;
+    };
+ 
+    struct ShmChunkDetail {
+        ShmChunkDetail():start_addr(NULL), end_addr(NULL),
+			idx_array(NULL),lock("shm_lock") {}
+        ~ShmChunkDetail() {
+            if (idx_array) {
+                ::free(idx_array);
+				idx_array = NULL;
+            }
+        }			
+        void dump() {
+            cout << "chunk_id: " << chunk_id;
+            cout << " start_addr: " << std::hex << (u64)start_addr;
+            cout << std::dec;
+            cout << " chunk_size: " << chunk_size;
+            cout << " unit_size: " << unit_size;
+            cout << " alloc_cursor: " << alloc_cursor;
+            cout << " min_unit_id: " << min_unit_id;
+            cout << " max_unit_id: " << max_unit_id;
+            cout << " num_unit: " << num_unit;
+            cout << " num_free_unit: " << num_free_unit;
+            cout << endl;
+        }
+		
+        u32 chunk_id;
+        char *start_addr;
+        char *end_addr;
+        idx_type *idx_array;
+        u32 chunk_size;
+        u32 unit_size;
+        u32 alloc_cursor;
+        u32 min_unit_id;
+        u32 max_unit_id;
+        u32 num_unit;
+        u32 num_free_unit;
+        PdcLock lock;
+    };
+	
+public:
     explicit ShmMem(int key,int iCreate=-1):m_pShm(NULL),m_iStatus(-1), m_iShmId(-1), 
-        m_key(key),m_iCreate(iCreate),usetype(0),lock("shmlock"){
+        m_key(key),m_iCreate(iCreate),lock("shmlock"){
         m_pShm = NULL;
+        shm_size = 0;
+        alloc_policy = ALLOC_POLICY_SINGLE_UNIT;
+        num_chunk = SHM_SPLIT_CHUNK_NUM;
+        if (1 == iCreate) {
+            use_type = SHM_USE_TYPE_SERVER;
+        } else {
+            use_type = SHM_USE_TYPE_CLIENT;
+        }			
     }
 
     ~ShmMem() {
         ::shmdt(m_pShm);
+        for (u32 chunk_id = 0; chunk_id < num_chunk; chunk_id++) {
+            ShmChunkDetail *chunk = &(chunk_detail[chunk_id]);
+            if (chunk->idx_array) {
+                ::free(chunk->idx_array);
+                chunk->idx_array = NULL;
+            }
+        }
     }
-    int Init(int _usetype=1){
+    int Init(){
+        int ret;
+		#if 0
         int ret = m_Sem.Init(m_key);
         if (ret < 0) {
             m_sErrMsg.clear();
             m_sErrMsg = m_Sem.GetErrMsg();
             return ret;
         }
-        m_iShmId = ::shmget(m_key,SHMSIZE,0);
+		#endif
+        /*get share memroy size*/
+        for (int i = 0; i < num_chunk; i++) {
+            shm_size += chunk_size[i].chunk_size;
+        }
+		
+        m_iShmId = ::shmget(m_key, shm_size, 0);
         if (m_iShmId < 0) {
             m_iCreate = 1;
-            m_iShmId = ::shmget(m_key, SHMSIZE, IPC_CREAT);
-            
+            m_iShmId = ::shmget(m_key, shm_size, IPC_CREAT);
         }
+		
         if (m_iShmId < 0) {
             m_sErrMsg.clear();
             m_sErrMsg = "shmget error ";
@@ -170,225 +266,222 @@ public:
             m_sErrMsg = "shmat error ";
             return -1;
         }
-        //attach superblock
-        //sb = (SuperBlock*)m_pShm;
-        item_size = sizeof(T);
-		max_idx = SHMSIZE / item_size;
-        
-        if (m_iCreate == 1 ) {
-            if(usetype == 0){
-                cerr<<"init to memory queue model"<<endl;
-                //QueueHead Head;
-                #if 0
-                sb->ItemSize= sizeof(T);
-                sb->AllSize = SHMSIZE  - 1024;
-                sb->AllCount = sb->AllSize / sb->ItemSize;
-                sb->DataCount = 0;
-                sb->Front = 0;
-                sb->Rear = 0;
-                sb->Avalid = sb->AllCount;
-                sb->Inuse = 0;
-                freelist.resize(sb->AllCount);
-                usedlist.resize(sb->AllCount);
-                //freelist()
-                //::memcpy(m_pShm,&Head,sizeof(QueueHead));
-				#endif
-				idx_array = (u64 *)::malloc(max_idx * sizeof(u64));
-				if (!idx_array) {
-					cerr << "failed to alloc idx_array!!!" << endl;
-					assert(0);
-				}
-
-				/*init idx_array*/
-				for (u64 i = 0; i < max_idx; i++) {
-					idx_array[i] = i;
-				}
-				alloc_cursor = max_idx - 1;
-				num_free_idx = max_idx;
-				cerr << "item_size:" << item_size << " max_idx:" << max_idx
-					<< " alloc_cursor:" << alloc_cursor
-					<< " num_free_idx:" << num_free_idx << endl;
-            }else if(usetype ==1){
-            
-            }
+                
+        ret = init_chunk_detail(use_type);		
+        if (ret < 0) {
+            m_sErrMsg.clear();
+            m_sErrMsg = "failed to init chunk detail ";
+            return -1;
         }
-        
         return m_iShmId;
     }
 
+#if 0
     bool isEmpty() {  //whether had memory to used?
 
 		return (num_free_idx == 0);
-	#if 0
-	 if(sb->Avalid > 0)
-            return false;
-	 else if(sb->Avalid == 0)
-	     return true;
-	 else{
-            cerr<<"superblock is:"<<sb<<endl;
-            assert(0);
-            return true;
-	  }
-	#endif
     }
 
     bool isFull() { // empty  == full ?
 
 		return (num_free_idx == 0);
-		#if 0
-        if(sb->Avalid > 0)
-            return false;
-        else if(sb->Avalid == 0)
-            return true;
-        else{
-            cerr<<"superblock is check full error:"<<sb<<endl;
-            assert(0);
-            return true;
-        }
-		#endif
     }
 
     int getSize() {
 
 		return max_idx;
-        //return sb->DataCount;
     }
     u64 getAvalid(){
 
 		return num_free_idx;
-        //return sb->Avalid;
     }
+#endif
     /* if in one simple thread ,do not use lock
     *   but ,when use in multithreads ,a lock is needed.
     */
-    int get(u32 size, u64* sum){  //Get memory block, 
-        //semLockGuard oLock(m_Sem);
-        lock.lock();
+    int get(u32 size, u64 *sum) {
+        assert(use_type == SHM_USE_TYPE_SERVER);
+        u32 last_chunk_unit_size = 0;
+		u32 chunk_id;
+	
+		if (ALLOC_POLICY_SINGLE_UNIT == alloc_policy) { 
+			for (chunk_id = 0 ; chunk_id < num_chunk; chunk_id++) {
+				ShmChunkDetail *chunk = &(chunk_detail[chunk_id]);
+				if (size > last_chunk_unit_size && size <= chunk->unit_size) {
+					chunk->lock.lock();
+					if (0 == chunk->num_free_unit) {
+						last_chunk_unit_size = 0;
+						chunk->lock.unlock();
+						continue;
+					}
+					sum[0] = chunk->idx_array[chunk->alloc_cursor];
+                    assert(sum[0] >= chunk->min_unit_id && 
+						       sum[0] <= chunk->max_unit_id);
+					chunk->alloc_cursor--;
+					chunk->num_free_unit--;
+					chunk->lock.unlock();
+					return 1;
+				}
+				last_chunk_unit_size = chunk->unit_size;
+			}
 
-        if (isFull()) {
-            //cerr<<"shm is full, all:"<<sb->AllCount<<" inuse:"<<sb->Inuse<<
-				//" freelist:"<<freelist.size()<<endl;
-            cerr << "shm is full" << endl; 
-            return -1;
-        }
-		
-        if (num_free_idx * item_size < size) {
-            cerr << "no enough memory" << endl;
-            return -1;
-        }
-		
-        u32 count = 0;
-        count = size / item_size;
-        count = ((count * item_size) >=  size) ? count : (count + 1);
-
-		for (u32 i = 0; i < count; i++) {
-			sum[i] = idx_array[alloc_cursor];
-			assert(sum[i] < max_idx);
-			alloc_cursor--;
+			if (num_chunk == chunk_id) {
+				cerr << "failed to get share memory" << endl; 
+				return -1;
+			}
 		}
-		num_free_idx -= count;
-		#if 0
-        while(count > 0){
-            //u64 tmp 
-            if(sb->Front < sb->AllCount){
-                for(u64 i = sb->Front; i< sb->AllCount && count > 0;i++){
-                    count--;
-                    sum[n++] = i;
-                    //usedlist.push_back(i);	//for now ,we do not need usedlist
-                    //sum.push_back(i);
-                    sb->Front = sb->Front+1;
-                    sb->Inuse++;
-                    sb->Avalid--;
-                }
-                
-            }else{
-                
-                assert(freelist.capacity() >= count);
-                if(sb->Avalid == 0){
-                    lock.unlock();
-		       return -1;
-                }
-                count--;
-                
-                sum[n++] = freelist.back();
-                //sum.push_back(freelist.front());
-                //freelist.pop_front();   //for list
-                freelist.pop_back();		//for vertor
-                //freelist.erase(freelist.begin());  //for vetor
-                sb->Inuse++;
-                sb->Avalid--;
-
-            }
-            
-    	}
-       assert(sb->Inuse + sb->Avalid == sb->AllCount);
-	   #endif
-	   lock.unlock();
-
-        return count;
     }
 
-    T *getaddbyindex(u64 index){
-		#if 0
-        if(index  > sb->AllCount ){
-            cerr<<"shm count max is:"<<sb->AllCount<<" now use:"<<index<<endl;;
-        }
-		#endif
-        assert(index < max_idx);
-
-        return (T *)(m_pShm + index * item_size);
-    }
-    int put(vector<u64> &used){
-        //semLockGuard oLock(m_Sem);
+    int put(vector<u64> &used) {
+		assert(use_type == SHM_USE_TYPE_SERVER);
         if (0 == used.size()) {
             cerr << "vector size is 0" << endl;
             return -2;
         }
-		
-        unsigned int size = 0;
-        lock.lock();
+        int put_size = 0;
+        int chunk_id;
         for (auto& it : used) {
-            assert(it < max_idx);
-            alloc_cursor++;
-            idx_array[alloc_cursor] = it;
-            //freelist.push_back(*it);
-            size++;
+            chunk_id = get_chunk_id(it);
+            if (-1 == chunk_id) {
+                cerr << "invalid memory index" << endl;
+                continue;
+            }
+            ShmChunkDetail *chunk = &(chunk_detail[chunk_id]);
+            assert(it >= chunk->min_unit_id && it <= chunk->max_unit_id);
+            chunk->lock.lock();
+            chunk->alloc_cursor++;
+            chunk->idx_array[chunk->alloc_cursor] = it;
+            chunk->num_free_unit++;
+            chunk->lock.unlock();
+            put_size++;
         }
-        num_free_idx += size;
-        //freelist.assign(used.begin(), used.end());
-        //freelist.splice(freelist.end(), used, used.begin(), used.end()); //for list
-        //sb->Avalid  += size;
-        //sb->Inuse -= size;
-        //assert(sb->Inuse + sb->Avalid == sb->AllCount);
-        lock.unlock();
         
-        return size;
+        return put_size;
+    }
+	
+    void *getaddbyindex(const u64 index) const {
+        //assert(use_type == SHM_USE_TYPE_CLIENT);
+        int chunk_id;
+
+        chunk_id = get_chunk_id(index);
+        if (-1 == chunk_id) {
+            cerr << "invalid memory index" << endl;
+            return NULL;
+        }
+        ShmChunkDetail const *chunk = &(chunk_detail[chunk_id]);
+        assert(index >= chunk->min_unit_id && index <= chunk->max_unit_id);
+        return (void *)(chunk->start_addr + 
+			           (index - chunk->min_unit_id) * chunk->unit_size);
     }
 
+	int get_unit_size(const u64 index) const {
+        assert(use_type == SHM_USE_TYPE_CLIENT);
+        int chunk_id;
+
+        chunk_id = get_chunk_id(index);
+        if (-1 == chunk_id) {
+            cerr << "invalid memory index" << endl;
+            return -1;
+        }
+        ShmChunkDetail const *chunk = &(chunk_detail[chunk_id]);
+        return chunk->unit_size;
+	}
+
+    int init_chunk_detail(int type) {        
+        u32 prev_chunk_size = 0;
+        u32 last_chunk_max_unit_id = 0;
+        u32 start_unit_id = 0;
+
+        if (!m_pShm) {
+            cerr << "error, m_pShm is NULL" << endl;
+            return -1;
+        }			
+        for (u32 chunk_id = 0; chunk_id < num_chunk; chunk_id++) {
+            ShmChunkDetail *chunk = &(chunk_detail[chunk_id]);
+            chunk->chunk_id = chunk_id;
+            chunk->start_addr = m_pShm + prev_chunk_size;
+            chunk->chunk_size = chunk_size[chunk_id].chunk_size;
+            chunk->unit_size = chunk_size[chunk_id].unit_size;
+            chunk->num_unit = chunk->chunk_size / chunk->unit_size;
+			
+            start_unit_id = (last_chunk_max_unit_id == 0) ? 
+							0 : (last_chunk_max_unit_id + 1);
+            chunk->min_unit_id = start_unit_id;
+            chunk->max_unit_id = (chunk->min_unit_id + chunk->num_unit - 1);
+            if (SHM_USE_TYPE_SERVER == type) {
+                cerr << "shm used by server" << endl;
+                chunk->idx_array = 
+                    (idx_type *)::malloc(chunk->num_unit * sizeof(idx_type));
+                if (!chunk->idx_array) {
+                    cerr << "failed to malloc idx_array" << endl;
+					//TODO:release other chunk memory
+				    return -1;
+                }
+                u32 unit_id = 0;
+                for (u32 i = 0; i < chunk->num_unit; i++) {
+                    unit_id = i + start_unit_id;
+                    chunk->idx_array[i] = unit_id;
+                }
+
+                chunk->alloc_cursor = chunk->num_unit - 1;
+                chunk->num_free_unit = chunk->num_unit;
+            } else {
+                cerr << "shm used by client" << endl;
+                chunk->idx_array = NULL;
+                chunk->alloc_cursor = 0;
+                chunk->num_free_unit = 0;
+            }
+		
+            prev_chunk_size += chunk->chunk_size;
+            last_chunk_max_unit_id = chunk->max_unit_id;
+            chunk->dump();
+        }
+		return 0;
+    }
+
+    int get_chunk_id(const idx_type index) const {		
+		int ret_chunk_id = -1;
+
+        for (idx_type chunk_id = 0; chunk_id < num_chunk; chunk_id++) {
+            ShmChunkDetail const *chunk = &(chunk_detail[chunk_id]);
+            if (index >= chunk->min_unit_id &&
+                index <= chunk->max_unit_id) {
+                ret_chunk_id = chunk_id;
+                break;
+            }
+        }
+		
+        return ret_chunk_id;
+    }
 
     std::string GetErrMsg() {
         return m_sErrMsg;
     }
-    private:
-    SuperBlock*sb;
-    int usetype;
+private:
+    //SuperBlock*sb;
+    //int usetype;
     char *m_pShm;
     int m_iShmId;
     int m_iStatus;
     int m_iCreate;
     int m_key;
-    //vector<u64> freelist;
-    //vector<u64> usedlist;
-    u64 *idx_array;
-    u64 max_idx;
-    u64 alloc_cursor;
-    u64 item_size;
-    u64 num_free_idx;
-    char *pdata;
-    T *pmem;
-    SemLock m_Sem;
+    //char *pdata;
+    //T *pmem;
+    //SemLock m_Sem;
     PdcLock lock;
     std::string m_sErrMsg;
+
+    int use_type;
+    int num_chunk;
+    int alloc_policy;
+    u64 shm_size;
+    ShmChunkSize chunk_size[SHM_SPLIT_CHUNK_NUM] = 
+    {
+        {SHM_CHUNK_SIZE_512M, SHM_UNIT_SIZE_32K}, 
+        {SHM_CHUNK_SIZE_512M, SHM_UNIT_SIZE_128K},
+        {SHM_CHUNK_SIZE_512M, SHM_UNIT_SIZE_512K},
+    };
+    ShmChunkDetail chunk_detail[SHM_SPLIT_CHUNK_NUM];
 };
 
 

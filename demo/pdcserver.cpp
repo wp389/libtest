@@ -97,10 +97,12 @@ void pdc_callback(rbd_completion_t cb, void *arg)
                 
                 for(int i = 0;i < op->u.data.chunksize;i++){
                 //memset(op->data.pdata, 6, op->data.len);
-                simpledata * pdata = pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
+                //simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
+                char *pdata = (char *)pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
                 //TODO: WRITE
-                lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-                ::memcpy((char *)pdata, buf+ pos,  lengh);
+                //lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
+                lengh = bufsize;
+                ::memcpy((char *)pdata, buf + pos,  lengh);
                 bufsize -= lengh;
                 pos += lengh;
                 }
@@ -153,7 +155,8 @@ void* Pdcserver::Iothreads::_process()
     u64 sum =0;
     u64 off = 0;
     u32 bufsize = 0;
-    u32 lengh;
+    u32 write_lengh;
+    int unit_size;
     char *buf;
     static bool flag = false;
     Pdcserver *pdc = (Pdcserver *)server;
@@ -195,34 +198,35 @@ void* Pdcserver::Iothreads::_process()
         switch(op->opcode){
         // aio write
         case PDC_AIO_WRITE:
-        if(!SERVER_IO_BLACKHOLE){
-        //rbd_completion_t comp;
-        off = op->u.data.offset;
-        bufsize = op->u.data.len;
-        lengh;
-        flag = false;
-        vol->do_create_rbd_completion(op, &comp);
-        for(int i = 0;i < op->u.data.chunksize;i++){
-            //memset(op->data.pdata, 6, op->data.len);
-            simpledata * pdata = pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
-            //TODO: WRITE
-            lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-            vol->do_aio_write(op, off+ i*CHUNKSIZE, lengh, (char *)pdata, comp);   
-            bufsize -= lengh;
-        }
-        }else {
-            op->ref_inc();
-            pdc_callback(NULL, op);
-            //continue;
-        }
-        break;
+            if (!SERVER_IO_BLACKHOLE) {
+                off = op->u.data.offset;
+                bufsize = op->u.data.len;
+                flag = false;
+                vol->do_create_rbd_completion(op, &comp);
+                /*TODO:deal with muti index,
+                           when multi aio write is done,we call function pdc_callback*/
+                for (int i = 0; i < op->u.data.chunksize; i++) {            
+                    assert(bufsize > 0);
+                    unit_size = pdc->slab.get_unit_size(op->u.data.indexlist[i]);
+                    assert(unit_size != -1);
+                    char *pdata = (char *)pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
+                    assert(pdata != NULL);
+                    write_lengh = bufsize > unit_size ? unit_size : bufsize;
+                    vol->do_aio_write(op, off, write_lengh, (char *)pdata, comp);   
+                    bufsize -= write_lengh;
+                    off += write_lengh;
+                }
+            } else {
+                op->ref_inc();
+                pdc_callback(NULL, op);
+               //continue;
+            }
+            break;
         // aio read
         case PDC_AIO_READ:
             //rbd_completion_t comp;
-            
             off = op->u.data.offset;
             bufsize = op->u.data.len;
-            lengh = 0;
             //buf = NULL;
             buf = (char *)malloc(op->u.data.len);
             op->op = (void *)buf;
@@ -669,6 +673,7 @@ void* Pdcserver::Msgthreads::_process()
             {
                 pdc->OpFindClient(msg);
                 r = pdc->slab.get(msg->u.data.len, msg->u.data.indexlist);
+				//cerr << "index: " << msg->data.indexlist[0] << endl;
                 if(r <= 0){
                     cerr<<"get memory failed"<<endl;
 			//TODO : need more todo
