@@ -78,6 +78,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
 
         case PDC_AIO_READ:
             op->opcode =  RW_R_FINISH;
+            #if 0
             buf = (char *)op->op;
             assert(buf);
             if(pdc){
@@ -113,6 +114,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
                 op->op = NULL;
                 buf = NULL;
             }
+            #endif
             break;
         default:
             op->dump("callback error code ");
@@ -125,10 +127,9 @@ void pdc_callback(rbd_completion_t cb, void *arg)
             cerr<<"callback to push pipe error:"<<r<<endl;
         }
         //TO DELETE OP
-        
+		pdc->msg_pool.free(op);
     }
     //delete op;
-	pdc->msg_pool.free(op);
     if(cb)
         rbd_aio_release(cb);
     

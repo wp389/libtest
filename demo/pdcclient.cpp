@@ -273,6 +273,24 @@ void* PdcClient::Msgthreads::_process()
                 }
                 break;
              case RW_R_FINISH:
+                 copy_loc = 0;
+                 bufsize = msg->u.data.len;
+                 buf = (char *)msg->originbuf;
+                 for (int i = 0;i < msg->u.data.chunksize; i++) {
+                     int unit_size;
+                     u32 copy_size;
+                     char *pdata;
+                     assert(bufsize > 0);
+                     unit_size = pdc->slab.get_unit_size(msg->u.data.indexlist[i]);
+                     assert(unit_size != -1);
+                     copy_size = bufsize > unit_size ? unit_size : bufsize;
+                     pdata = (char *)pdc->slab.getaddbyindex(msg->u.data.indexlist[i]);
+                     assert(pdata != NULL);
+                     ::memcpy(buf + copy_loc, pdata, copy_size);
+                     bufsize -= copy_size;
+                     copy_loc += copy_size;
+				 }
+
                 //cerr<<"read op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
                 c = reinterpret_cast<PdcCompletion*>(msg->u.data.c);
                 if(c && c->callback){
