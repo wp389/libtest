@@ -247,10 +247,10 @@ public:
             shm_size += chunk_size[i].chunk_size;
         }
 		
-        m_iShmId = ::shmget(m_key, shm_size, 0);
+        m_iShmId = ::shmget(m_key, shm_size, 0777);
         if (m_iShmId < 0) {
             m_iCreate = 1;
-            m_iShmId = ::shmget(m_key, shm_size, IPC_CREAT);
+            m_iShmId = ::shmget(m_key, shm_size, IPC_CREAT| 0777);
         }
 		
         if (m_iShmId < 0) {
@@ -261,7 +261,7 @@ public:
         }
 
         m_pShm = (char*)::shmat(m_iShmId,NULL,0);//¶ÁÐ´Ä£Ê½£»
-        if (m_pShm == NULL) {
+        if (m_pShm == (void *)-1) {
             m_sErrMsg.clear();
             m_sErrMsg = "shmat error ";
             return -1;
