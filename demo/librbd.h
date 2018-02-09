@@ -85,8 +85,26 @@ int rbd_close(rbd_image_t image);
 int rbd_stat(rbd_image_t image, rbd_image_info_t *info,
                           size_t infosize);
 
+
 typedef void *rbd_completion_t;
 typedef void (*rbd_callback_t)(rbd_completion_t cb, void *arg);
+
+int rbd_create(rados_ioctx_t io, const char *name, uint64_t size,
+                            int *order);
+int rbd_resize(rbd_image_t image, uint64_t size);
+
+int rbd_snap_create(rbd_image_t image, const char *snapname);
+int rbd_snap_remove(rbd_image_t image, const char *snapname);
+int rbd_snap_rollback(rbd_image_t image, const char *snapname);
+
+int rbd_aio_discard(rbd_image_t image, uint64_t off, uint64_t len,
+			       rbd_completion_t c);
+
+int rbd_snap_list(rbd_image_t image, rbd_snap_info_t *snaps,
+                               int *max_snaps);
+void rbd_snap_list_end(rbd_snap_info_t *snaps);
+
+int rbd_snap_rollback(rbd_image_t image, const char *snapname);
 
 int rbd_aio_write(rbd_image_t image, u64 off, size_t len,
                                const char *buf, rbd_completion_t c);

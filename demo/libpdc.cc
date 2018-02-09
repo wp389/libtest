@@ -20,6 +20,15 @@ extern "C" void rbd_version(int *major, int *minor, int *extra)
     *extra = LIBRBD_VER_EXTRA;
 }
 
+extern "C" int rbd_resize(rbd_image_t image, uint64_t size)
+{
+    return 0;
+}
+extern "C" int rbd_create(rados_ioctx_t p, const char *name, uint64_t size, int *order)
+{
+    printf("rbd_create \n");
+    return 0;
+}
 extern "C" int rados_create(rados_t *prados)
 //int pdc_create_rados(pdc_rados_t *prados)
 {
@@ -247,6 +256,49 @@ extern "C" int rbd_close(rbd_image_t image)
     
     return 0;
 }
+extern "C" int rbd_snap_create(rbd_image_t image, const char *snapname)
+{
+    printf("rbd_snap_create todo:\n");
+    return 0;
+}
+extern "C" int rbd_snap_remove(rbd_image_t image, const char *snapname)
+{
+
+    printf("rbd_snap_remove \n");
+    return 0;
+}
+extern "C" int rbd_snap_rollback(rbd_image_t image, const char *snapname)
+{
+    printf("rbd_snap_rollback");
+    return 0;;
+}
+extern "C" int rbd_snap_list(rbd_image_t image, rbd_snap_info_t *snaps,
+                               int *max_snaps)
+{
+    int r;
+    printf("rbd_snap_list \n");
+    if (*max_snaps < 1) {
+        *max_snaps = 1;
+        return -ERANGE;
+    }  
+    snaps[0].id = 0;
+    snaps[0].size = 0;
+    snaps[0].name = NULL;
+    r = 0;
+    return r;
+}
+extern "C" void rbd_snap_list_end(rbd_snap_info_t *snaps)
+{
+    printf("rbd_snap_list_end \n");
+    return ;
+}
+extern "C" int rbd_aio_discard(rbd_image_t image, uint64_t off, uint64_t len,
+			       rbd_completion_t c)
+{
+    printf("rbd_aio_discard \n");
+    return 0;
+}
+
 extern "C" int rbd_aio_create_completion(void *cb_arg,
 					 rbd_callback_t cb,
 					 rbd_completion_t *c)
@@ -297,7 +349,7 @@ extern "C" int rbd_aio_flush(rbd_image_t image, rbd_completion_t c)
 {
     
 
-
+    printf("rbd_aio_flush \n");
     return 0;
 }
 extern "C" void rbd_aio_release(rbd_completion_t c)

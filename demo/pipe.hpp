@@ -169,7 +169,7 @@ public:
 				}
 				if(1){
 					if(access(m_key.c_str(), F_OK) != 0){
-	                               ret = mkfifo(m_key.c_str(),  0777);
+	                               ret = mkfifo(m_key.c_str(), S_IFIFO| 0777);
 	                               if(ret < 0 ){
 	                                 cerr<<"mkfifo :"<<m_key<<"failed "<<endl; 
 						return -1; 

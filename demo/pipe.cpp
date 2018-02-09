@@ -3,7 +3,7 @@
 #include "type.h"
 #include <iostream>
 #include <sstream>
-
+#include <sys/stat.h>
 #include "pipe.hpp"
 
 using namespace std;
@@ -51,7 +51,7 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
     int skey;
     int r;
     pid_t pid= getpid();
-    newkey<<"/tmp/"<<pid<<GetMqKey();
+    newkey<<"/qemu/"<<pid<<GetMqKey();
     newkey >>pkey;
     skey = GetMqKey() +pid;
     
@@ -66,7 +66,7 @@ int createclientqueues(map<string ,void *> &mqs,bool sw)
     
     if(MULTIPIPE){
         
-        newsendkey<<"/tmp/"<<pid<<GetMqKey();
+        newsendkey<<"/qemu/"<<pid<<GetMqKey();
         newsendkey >>pskey;
         skey = GetMqKey() +pid;
         cerr<<"create client send queue:"<<pskey<<" semkey:"<<skey<<" sw is:"<<sw<<endl;

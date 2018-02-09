@@ -34,7 +34,8 @@ extern u64 opid;
      server default is 123
 */
 #define MEMKEY 123
-#define PIPEKEY "/tmp/FIFO"
+#define PIPEKEY "/qemu/FIFO"
+#define PIPEPREFIX "/qemu/"
 #define PIPESEMKEY 249
 #define MEMSEM 23
 #define MEMQSEM 45
@@ -58,6 +59,7 @@ extern u64 opid;
 #define CHUNKSIZE 4096
 #define EPOLLSIZE 1024
 
+#define LOG_SW false
 #define MEMPOOL_UNIT_NUMER_SHIFT 15
 #define MEMPOOL_UNIT_NUMER (1 << MEMPOOL_UNIT_NUMER_SHIFT)
 
@@ -301,10 +303,10 @@ struct  Msginfo{
     int return_code;
     void *slab;
 	
-    Msginfo():sw(false),opid(0),remote_pid(0),return_code(0),ref(0) {pid = getpid(); }
+    Msginfo():sw(LOG_SW),opid(0),remote_pid(0),return_code(0),ref(0) {pid = getpid(); }
 	/*init some member,just like the default construction function*/
 	void default_init() {
-		sw = false;
+		sw = LOG_SW;
 		opid = 0;
 		remote_pid = 0;
 		return_code = 0;
@@ -313,7 +315,7 @@ struct  Msginfo{
 	}
 	/*init some member after reading pipe*/
 	void init_after_read() {
-		sw = false;
+		sw = LOG_SW;
 		ref = 0;
 		remote_pid = pid;
 		pid = getpid();

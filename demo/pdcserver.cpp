@@ -1,11 +1,6 @@
-//#include "rbd-bak/librbd.h"
-//#include "rados-bak/librados.h"
 
-
-//#include "type.h"
 #include "pdcserver.hpp"
 #include <sys/prctl.h>
-//#include "backend_ceph.hpp"
 
 Pdcserver*pdc_server_mgr;
 
@@ -219,7 +214,7 @@ void* Pdcserver::Iothreads::_process()
                     off += write_length;
                 }
             } else {
-				op->ref_inc();
+                op->ref_inc();
                 pdc_callback(NULL, op);
                //continue;
             }
@@ -689,7 +684,6 @@ void* Pdcserver::Msgthreads::_process()
             {
                 pdc->OpFindClient(msg);
                 r = pdc->slab.get(msg->u.data.len, msg->u.data.indexlist);
-				//cerr << "index: " << msg->data.indexlist[0] << endl;
                 if(r <= 0){
                     cerr<<"get memory failed"<<endl;
 			//TODO : need more todo
