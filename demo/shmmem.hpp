@@ -375,7 +375,7 @@ public:
     }
 
 	int get_unit_size(const u64 index) const {
-        assert(use_type == SHM_USE_TYPE_CLIENT);
+        //assert(use_type == SHM_USE_TYPE_CLIENT);
         int chunk_id;
 
         chunk_id = get_chunk_id(index);

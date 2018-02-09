@@ -320,6 +320,7 @@ struct  Msginfo{
 	}
     void getopid() {opid = ++msgid;}
     void ref_inc() {ref++;}
+	//TODO:add lock to protect ref
     void ref_dec() {ref--;}
     bool isdone() {return ref == 0;}
     int copy(Msginfo *m){
