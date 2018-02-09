@@ -3,7 +3,8 @@
 echo "remove original soft link"
 rm /lib64/librbd.so.1 /lib64/librados.so.2 -f
 echo "copy libpdc"
-cp -f libpdc.so.1.0.0 /lib64/
+rm -f /lib64/libpdc.so.1.0.0
+cp obj/libpdc.so.1.0.0 /lib64/
 echo "link librbd.so and librados.so to libpdc"
 ln -s /lib64/libpdc.so.1.0.0 /lib64/librbd.so.1
 ln -s /lib64/libpdc.so.1.0.0 /lib64/librados.so.2
