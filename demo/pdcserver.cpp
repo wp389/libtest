@@ -201,9 +201,8 @@ void* Pdcserver::Iothreads::_process()
         switch(op->opcode){
         // aio write
         case PDC_AIO_WRITE:
-            flag = false;
             if (!SERVER_IO_BLACKHOLE) {
-                op->ref_add(op->u.data.chunksize);
+                flag = false;
                 off = op->u.data.offset;
                 bufsize = op->u.data.len;
                 for (int i = 0; i < op->u.data.chunksize; i++) {            
@@ -235,9 +234,8 @@ void* Pdcserver::Iothreads::_process()
                 break;
             }
             op->u.data.chunksize = num_index; 
-            flag = false;
             if (!SERVER_IO_BLACKHOLE) {
-                op->ref_add(num_index);
+                flag = false;
                 off = op->u.data.offset;
                 bufsize = op->u.data.len;
                 for (int i = 0; i < op->u.data.chunksize; i++) {
