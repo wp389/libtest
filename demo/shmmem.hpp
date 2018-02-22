@@ -146,11 +146,13 @@ chunk(512MB) -> | 32k unit |32k unit |32k unit |32k unit |32k unit |...         
                          ^
                           start_addr
 */       
-#define SHM_SPLIT_CHUNK_NUM 3
+#define SHM_SPLIT_CHUNK_NUM 4
 #define SHM_CHUNK_SIZE_512M (512 * 1024 * 1024)
 #define SHM_UNIT_SIZE_32K  (32 * 1024)
 #define SHM_UNIT_SIZE_128K  (128 * 1024)
 #define SHM_UNIT_SIZE_512K  (512 * 1024)
+#define SHM_UNIT_SIZE_4M  (4* 1024 * 1024)
+
 
 class ShmMem {
 public:
@@ -480,6 +482,7 @@ private:
         {SHM_CHUNK_SIZE_512M, SHM_UNIT_SIZE_32K}, 
         {SHM_CHUNK_SIZE_512M, SHM_UNIT_SIZE_128K},
         {SHM_CHUNK_SIZE_512M, SHM_UNIT_SIZE_512K},
+        {SHM_CHUNK_SIZE_512M, SHM_UNIT_SIZE_4M},
     };
     ShmChunkDetail chunk_detail[SHM_SPLIT_CHUNK_NUM];
 };

@@ -233,7 +233,10 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
     if(MULTIPIPE){
         Msginfo *msg = new Msginfo();
         msg->opcode = PDC_ADD_EPOLL;
-    
+        // in this model , maybe register vm in server thread-1, but
+        // add_fd in thread-2,that can make some error for can't find volume
+        // so here must sleep 1-2s in this version..
+        sleep(2);
         strcpy(msg->u.mgr.client.cluster,"ceph");
         strcpy(msg->u.mgr.client.pool, prados->GetName());
         strcpy(msg->u.mgr.client.volume,rbd_name);
@@ -375,7 +378,8 @@ extern "C" void demo_completion(pdc_rbd_completion_t c,void *arg)
 extern "C" int rbd_stat(rbd_image_t image, rbd_image_info_t *info,
 	                                size_t infosize)
 {
-    info->size = 10737418240;//1024*1024*1024*10;
+    //info->size = 10737418240;//1024*1024*1024*10;
+    info->size = 161061273600; //150G
     info->obj_size = 1024*1024*4;
     info->num_objs = 256;
     info->order = 22;

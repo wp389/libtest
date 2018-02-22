@@ -29,3 +29,6 @@ randwrite can up to max 280k iops ,average 400+us with blackhole.
 2018:2-7
 listen thread can shard listen fds.
 and sum iops can to 400k for blackhole model.
+
+2018:2-22
+vm + pdc can run 4k test.
