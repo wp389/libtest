@@ -153,7 +153,6 @@ chunk(512MB) -> | 32k unit |32k unit |32k unit |32k unit |32k unit |...         
 #define SHM_UNIT_SIZE_512K  (512 * 1024)
 #define SHM_UNIT_SIZE_4M  (4* 1024 * 1024)
 
-
 class ShmMem {
 public:
     typedef unsigned int idx_type;
@@ -301,40 +300,67 @@ public:
     /* if in one simple thread ,do not use lock
     *   but ,when use in multithreads ,a lock is needed.
     */
-    int get(u32 size, u64 *sum) {
+    int get(u32 size, u32 *sum) {
         assert(use_type == SHM_USE_TYPE_SERVER);
+        assert(size > 0 && sum != NULL);
         u32 last_chunk_unit_size = 0;
-		u32 chunk_id;
-	
-		if (ALLOC_POLICY_SINGLE_UNIT == alloc_policy) { 
-			for (chunk_id = 0 ; chunk_id < num_chunk; chunk_id++) {
-				ShmChunkDetail *chunk = &(chunk_detail[chunk_id]);
-				if (size > last_chunk_unit_size && size <= chunk->unit_size) {
-					chunk->lock.lock();
-					if (0 == chunk->num_free_unit) {
-						last_chunk_unit_size = 0;
-						chunk->lock.unlock();
-						continue;
-					}
-					sum[0] = chunk->idx_array[chunk->alloc_cursor];
-                    assert(sum[0] >= chunk->min_unit_id && 
-						       sum[0] <= chunk->max_unit_id);
-					chunk->alloc_cursor--;
-					chunk->num_free_unit--;
-					chunk->lock.unlock();
-					return 1;
-				}
-				last_chunk_unit_size = chunk->unit_size;
-			}
+        u32 chunk_id;
 
-			if (num_chunk == chunk_id) {
-				cerr << "failed to get share memory" << endl; 
-				return -1;
-			}
-		}
+        if (size > chunk_detail[num_chunk - 1].unit_size) {
+            /*we need to allocate muti unit*/
+            ShmChunkDetail *chunk = &(chunk_detail[num_chunk - 1]);
+            u32 num_unit_needed = size / chunk->unit_size;
+            if (0 != (size % chunk->unit_size)) { 
+                num_unit_needed++; 
+            }
+            if (num_unit_needed > MAX_ALLOC_UNIT_NUM) {
+                cerr << "too many shm unit needed" << endl; 
+                return -1;
+            }
+            chunk->lock.lock();
+            if (chunk->num_free_unit < num_unit_needed) {
+                chunk->lock.unlock();
+                cerr << "no enough shm unit" << endl; 
+                return -1;
+            }
+            for (u32 i = 0; i < num_unit_needed; i++) {
+                sum[i] = chunk->idx_array[chunk->alloc_cursor];
+                chunk->alloc_cursor--;
+                chunk->num_free_unit--;
+            }
+            chunk->lock.unlock();
+			
+            return num_unit_needed;
+        } else {
+            /*a single unit is just ok */
+            for (chunk_id = 0 ; chunk_id < num_chunk; chunk_id++) {
+                ShmChunkDetail *chunk = &(chunk_detail[chunk_id]);
+                if (size > last_chunk_unit_size && size <= chunk->unit_size) {
+                    chunk->lock.lock();
+                    if (0 == chunk->num_free_unit) {
+                        last_chunk_unit_size = 0;
+                        chunk->lock.unlock();
+                        continue;
+                    }
+                    sum[0] = chunk->idx_array[chunk->alloc_cursor];
+                    assert(sum[0] >= chunk->min_unit_id && 
+                            sum[0] <= chunk->max_unit_id);
+                    chunk->alloc_cursor--;
+                    chunk->num_free_unit--;
+                    chunk->lock.unlock();
+                    return 1;
+                }
+                last_chunk_unit_size = chunk->unit_size;
+            }
+
+            if (num_chunk == chunk_id) {
+                cerr << "failed to get share memory" << endl; 
+                return -1;
+            }
+        }
     }
 
-    int put(vector<u64> &used) {
+    int put(vector<u32> &used) {
 		assert(use_type == SHM_USE_TYPE_SERVER);
         if (0 == used.size()) {
             cerr << "vector size is 0" << endl;
@@ -361,7 +387,7 @@ public:
         return put_size;
     }
 	
-    void *getaddbyindex(const u64 index) const {
+    void *getaddbyindex(const u32 index) const {
         //assert(use_type == SHM_USE_TYPE_CLIENT);
         int chunk_id;
 
@@ -376,7 +402,7 @@ public:
 			           (index - chunk->min_unit_id) * chunk->unit_size);
     }
 
-	int get_unit_size(const u64 index) const {
+	int get_unit_size(const u32 index) const {
         //assert(use_type == SHM_USE_TYPE_CLIENT);
         int chunk_id;
 

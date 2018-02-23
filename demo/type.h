@@ -63,6 +63,8 @@ extern u64 opid;
 #define MEMPOOL_UNIT_NUMER_SHIFT 15
 #define MEMPOOL_UNIT_NUMER (1 << MEMPOOL_UNIT_NUMER_SHIFT)
 
+#define MAX_ALLOC_UNIT_NUM 16
+
 using namespace std;
 //using namespace wp::Pipe;
 //using namespace pdcPipe::PdcPipe;
@@ -79,12 +81,15 @@ struct simpledata{
     char data[CHUNKSIZE];
 };
 struct pdcdata{
-    void * c;
+    void *c;
+    char *buffer;/*used when io_split is false in PdcServer*/
     u64 offset;
     int len;
     int chunksize;
-    u64 indexlist[4];
-
+/*we assume that the max size of a single IO comes from qemu is 64MB,as the max share 
+memroy unit size is 4MB,so the max index number we needed is 16*/
+//TODO:we should make sure that the the max size of a single IO comes from qemu is 64MB
+    u32 indexlist[MAX_ALLOC_UNIT_NUM];
 };
 
 class Threadpool{
@@ -216,7 +221,6 @@ typedef enum {
     PUT_SHM,
 
 }PdcIomachine;
-
 
 struct Times{
 	struct timeval time;

@@ -87,7 +87,9 @@ public:
     list<Msginfo *>msgop;
     Msgthreads *msgthread;
 	MemPool<Msginfo> msg_pool;
-    
+
+    /*split IO to muti sub-IO when getting muti shm unit index*/
+    bool io_split;
     
 public:
     Pdcserver(string nm): perf(),time(),servername(nm),pid(-1),threadnum(2),
@@ -97,14 +99,15 @@ public:
         slab(MEMKEY, SERVERCREATE),
         iolock("client-iolock"),
         listenlock("client-listenlock"),
-        msglock("client-msglock")
+        msglock("client-msglock"),
+        io_split(true)
         {pid = getpid();
             time.reset();
         }
     ~Pdcserver();
     void do_work(Pdcserver *server);
     int init();
-    int getshm(u32 size, u64* sum){
+    int getshm(u32 size, u32 *sum){
         return slab.get( size, sum);
 
     }
@@ -115,7 +118,7 @@ public:
     int release_shmkey(Msginfo *op )
     {
         int n;
-        vector<u64> mems(op->u.data.indexlist,op->u.data.indexlist+ op->u.data.chunksize);
+        vector<u32> mems(op->u.data.indexlist,op->u.data.indexlist+ op->u.data.chunksize);
         n = slab.put(mems);
         //r = slab.put(indexlist);
         //cerr<<"free usedlist :"<<r<<endl;

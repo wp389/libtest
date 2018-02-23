@@ -62,7 +62,7 @@ void pdc_callback(rbd_completion_t cb, void *arg)
             //todo put shmmemory keys .  
             
             if(pdc){
-                vector<u64> index(op->u.data.indexlist,op->u.data.indexlist+op->u.data.chunksize);
+                vector<u32> index(op->u.data.indexlist,op->u.data.indexlist+op->u.data.chunksize);
                 n = pdc->slab.put(index);
                 if(n < 0 ){
                     cerr<<"shm->put falied:"<<n <<" and index is:"<<index.size()<<endl;
@@ -122,7 +122,12 @@ void pdc_callback(rbd_completion_t cb, void *arg)
             cerr<<"callback to push pipe error:"<<r<<endl;
         }
         //TO DELETE OP
-		pdc->msg_pool.free(op);
+        if (!pdc->io_split && op->u.data.chunksize > 1) {
+            assert(op->u.data.buffer);
+            ::free((void *)op->u.data.buffer);
+            op->u.data.buffer = NULL;
+        }
+        pdc->msg_pool.free(op);
     }
     //delete op;
     if(cb)
@@ -155,6 +160,8 @@ void* Pdcserver::Iothreads::_process()
     u32 read_length;
     int unit_size;
     int num_index = 0;
+    u32 copy_loc = 0;
+    u32 copy_length;
     char *buf;
     static bool flag = false;
     Pdcserver *pdc = (Pdcserver *)server;
@@ -200,18 +207,45 @@ void* Pdcserver::Iothreads::_process()
                 flag = false;
                 off = op->u.data.offset;
                 bufsize = op->u.data.len;
-                for (int i = 0; i < op->u.data.chunksize; i++) {            
-                    assert(bufsize > 0);
-                    unit_size = pdc->slab.get_unit_size(op->u.data.indexlist[i]);
-                    assert(unit_size != -1);
-                    char *pdata = 
-                        (char *)pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
-                    assert(pdata != NULL);
-                    write_length = bufsize > unit_size ? unit_size : bufsize;
-					vol->do_create_rbd_completion(op, &comp);
-                    vol->do_aio_write(op, off, write_length, pdata, comp);   
-                    bufsize -= write_length;
-                    off += write_length;
+                if (pdc->io_split ||
+                    (!pdc->io_split && op->u.data.chunksize == 1)) {
+                    /*issue multi sub-IO when getting muti shm unit index*/
+                    for (int i = 0; i < op->u.data.chunksize; i++) {            
+                        assert(bufsize > 0);
+                        unit_size = 
+                            pdc->slab.get_unit_size(op->u.data.indexlist[i]);
+                        assert(unit_size != -1);
+                        char *pdata = (char *)
+                            pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
+                        assert(pdata != NULL);
+                        write_length = bufsize > unit_size ? unit_size : bufsize;
+                        vol->do_create_rbd_completion(op, &comp);
+                        vol->do_aio_write(op, off, write_length, pdata, comp);   
+                        bufsize -= write_length;
+                        off += write_length;
+                    }
+                } else {
+                    /*gather multi shm to a larger buffer, and issue a single IO*/
+                    char *tmp_buffer;
+                    tmp_buffer = (char *)::malloc(op->u.data.len);
+                    assert(tmp_buffer);
+					op->u.data.buffer = tmp_buffer;
+                    copy_loc = 0;
+                    for (int i = 0; i < op->u.data.chunksize; i++) {            
+                        assert(bufsize > 0);
+                        unit_size = 
+                             pdc->slab.get_unit_size(op->u.data.indexlist[i]);
+                        assert(unit_size != -1);
+                        char *pshm = (char *)
+                            pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
+                        assert(pshm != NULL);
+                        copy_length = bufsize > unit_size ? unit_size : bufsize;
+                        ::memcpy(tmp_buffer + copy_loc, pshm, copy_length);
+                        bufsize -= copy_length;
+                        copy_loc += copy_length;
+                    }
+                    vol->do_create_rbd_completion(op, &comp);
+                    vol->do_aio_write(op, off, op->u.data.len, tmp_buffer, comp);						
                 }
             } else {
                 op->ref_inc();
@@ -233,6 +267,7 @@ void* Pdcserver::Iothreads::_process()
                 flag = false;
                 off = op->u.data.offset;
                 bufsize = op->u.data.len;
+                //TODO:deal with io_split
                 for (int i = 0; i < op->u.data.chunksize; i++) {
                     assert(bufsize > 0);
                     unit_size = pdc->slab.get_unit_size(op->u.data.indexlist[i]);
