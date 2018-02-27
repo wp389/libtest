@@ -51,7 +51,7 @@ extern u64 opid;
 #define SERVERCREATE 1
 #define CLIENTNOCREATE 0
 
-#define SERVER_IO_BLACKHOLE 1
+#define SERVER_IO_BLACKHOLE 0
 
 #define SHARD_LISTEN 1
 #define DIRECT_ACK 0
@@ -219,7 +219,8 @@ typedef enum {
     RW_W_FINISH,		//22
     RW_R_FINISH,			//23
     PUT_SHM,
-
+    PDC_AIO_FLUSH,		//25
+    PDC_AIO_FLUSH_FINISH,	//26
 }PdcIomachine;
 
 struct Times{

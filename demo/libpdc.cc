@@ -352,8 +352,20 @@ extern "C" int rbd_aio_flush(rbd_image_t image, rbd_completion_t c)
 {
     
 
-    printf("rbd_aio_flush \n");
-    return 0;
+    //printf("rbd_aio_flush \n");
+    int r;
+    PdcCompletion *comp = (PdcCompletion *)c;
+    BackendClient::RbdVolume *prbd = (BackendClient::RbdVolume *)image;
+    PdcClient * pdc = pdc_client_mgr;
+    if(0)
+      r = pdc->aio_flush(prbd,comp);
+    //r = prbd->aio_write(off, len, buf, comp);
+    else{
+        r = 0;
+        comp->complete(0);
+        
+    }
+    return r;
 }
 extern "C" void rbd_aio_release(rbd_completion_t c)
 //void pdc_aio_release(pdc_rbd_completion_t c)

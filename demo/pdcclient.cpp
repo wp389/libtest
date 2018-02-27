@@ -124,12 +124,8 @@ void* PdcClient::Finisherthreads::_process()
                 pdc->msgcond.Signal();
                 break;
             case RW_W_FINISH:
-                pdc->msglock.lock();
-                pdc->msgop.push_back(msg);
-                pdc->msgcond.Signal();
-                pdc->msglock.unlock();
-                break;
             case RW_R_FINISH:
+            case PDC_AIO_FLUSH_FINISH:
                 pdc->msglock.lock();
                 pdc->msgop.push_back(msg);
                 pdc->msgcond.Signal();
@@ -261,6 +257,13 @@ void* PdcClient::Msgthreads::_process()
             //send msg and wait for ack:
                 assert(0);
                 break;
+            case PDC_AIO_FLUSH:
+                msg->getopid();
+                //p_pipe = (pdcPipe::PdcPipe<Msginfo>*)prbd->mq[SENDMQ]; 
+                p_pipe = (pdcPipe::PdcPipe<Msginfo>*)pdc->mq[SENDMQ]; 
+                assert(p_pipe);
+                r = p_pipe->push(msg);
+                break;
             case RW_W_FINISH:
                 //assert(prbd);
                 //cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;
@@ -312,7 +315,14 @@ void* PdcClient::Msgthreads::_process()
                     msg->dump(" msg push failed" );
                 }
                 break;
-            
+            case PDC_AIO_FLUSH_FINISH:
+                c = reinterpret_cast<PdcCompletion*>(msg->u.data.c);
+                if(c && c->callback){
+                    ///c->callback(c->comp, c->callback_arg);
+                    c->complete(msg->return_code);
+                    c->release();
+                }
+                break;
             default:
                 cerr<<"other code? :"<<msg->opcode<<endl;
                 break;
@@ -468,5 +478,21 @@ int PdcClient::aio_read(BackendClient::RbdVolume *prbd, u64 offset, size_t len,c
     return 0;
 }
 
+int PdcClient::aio_flush(BackendClient::RbdVolume *prbd,  PdcCompletion *c)
+{
+    Msginfo *msg  = msg_pool.malloc();
+    msg->default_init();
+    //msg->getopid();
+    msg->opcode = PDC_AIO_FLUSH;
+    strcpy(msg->u.mgr.client.pool, prbd->rados->GetName());
+    strcpy(msg->u.mgr.client.volume, prbd->GetName());
+    msg->u.data.c = (void *)c;
+    msg->insert_volume((void *)prbd);
+    msg->dump("rbd aio flush");
+    
+    /*add request to completion*/
+    c->add_request();
+    enqueue(msg);
 
 
+}

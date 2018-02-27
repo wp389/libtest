@@ -96,7 +96,16 @@ int CephBackend::RbdVolume::do_aio_read(void *_op,u64 offset, size_t len, char *
 return r;
 }
 
-
+int CephBackend::RbdVolume::do_aio_flush(void *_op, rbd_completion_t c)
+{
+    int r;
+    Msginfo* op= (Msginfo *)_op;
+    if(!image) return -1;
+    op->ref_inc();
+    r = rbd_aio_flush(image, c);
+   
+   return r; 
+}
 int CephBackend::register_client(map<string,string > &vmclient, Msginfo *msg)
 {
     int r;

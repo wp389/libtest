@@ -73,43 +73,9 @@ void pdc_callback(rbd_completion_t cb, void *arg)
 
         case PDC_AIO_READ:
             op->opcode =  RW_R_FINISH;
-            #if 0
-            buf = (char *)op->op;
-            assert(buf);
-            if(pdc){
-                 // copy buffer
-                 
-                //vector<u64> index(op->data.indexlist,op->data.indexlist+op->data.chunksize);
-                n = pdc->slab.get(op->u.data.len, op->u.data.indexlist);
-                if(n < 0 ){
-                    cerr<<"callback slab->get failed:"<< n <<" and index is:"<<op->u.data.chunksize<<endl;
-                    //return ;
-                    break;
-                }
-                op->u.data.chunksize = n;
-                bufsize = op->u.data.len;
-                lengh = 0;
-                pos = 0;
-                
-                for(int i = 0;i < op->u.data.chunksize;i++){
-                //memset(op->data.pdata, 6, op->data.len);
-                //simpledata * pdata = pdc->slab.getaddbyindex(op->data.indexlist[i]);
-                char *pdata = (char *)pdc->slab.getaddbyindex(op->u.data.indexlist[i]);
-                //TODO: WRITE
-                //lengh = bufsize > CHUNKSIZE ? CHUNKSIZE:bufsize;
-                lengh = bufsize;
-                ::memcpy((char *)pdata, buf + pos,  lengh);
-                bufsize -= lengh;
-                pos += lengh;
-                }
-
-            }
-            if(buf){
-                ::free(buf);
-                op->op = NULL;
-                buf = NULL;
-            }
-            #endif
+            break;
+        case PDC_AIO_FLUSH:
+            op->opcode =  RW_R_FINISH;;
             break;
         default:
             op->dump("callback error code ");
@@ -285,7 +251,22 @@ void* Pdcserver::Iothreads::_process()
                 op->ref_inc();
                 pdc_callback(NULL, op);
             }
-            break;		
+            break;
+        case PDC_AIO_FLUSH:
+            if (!SERVER_IO_BLACKHOLE) {
+                if(0){
+                    vol->do_create_rbd_completion(op, &comp);
+                    vol->do_aio_flush(op, comp);
+                }else{
+                    op->ref_inc();
+                    pdc_callback(NULL, op);
+                }
+            }else{
+                op->ref_inc();
+                pdc_callback(NULL, op);
+            }
+
+            break;
         default:
             assert(0);
             break;
@@ -304,6 +285,7 @@ int handle_listen_events(Pdcserver *pdc, Msginfo* op)
         if(op)
             op->dump("listen thread get op");
         switch(op->opcode){
+        case PDC_AIO_FLUSH:
         case PDC_AIO_WRITE:
             pdc->iolock.lock();
             pdc->ops.push_back(op);

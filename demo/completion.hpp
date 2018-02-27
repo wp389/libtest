@@ -51,6 +51,7 @@ public:
         //cerr<<"client get rbd return value :"<< retcode <<endl;
         if(callback)
             callback(this, callback_arg);
+        
         done = true;
         cond.Signal();
 

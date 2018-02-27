@@ -144,6 +144,7 @@ public:
     }
     int aio_write(BackendClient::RbdVolume *prbd, u64 offset, size_t len,const char *buf, PdcCompletion *c);
     int aio_read(BackendClient::RbdVolume *prbd, u64 offset, size_t len,const char *buf, PdcCompletion *c);
+    int aio_flush(BackendClient::RbdVolume *prbd,  PdcCompletion *c);
 };
 
 
