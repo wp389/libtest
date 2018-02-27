@@ -362,8 +362,9 @@ extern "C" int rbd_aio_flush(rbd_image_t image, rbd_completion_t c)
     //r = prbd->aio_write(off, len, buf, comp);
     else{
         r = 0;
-        comp->complete(0);
-        
+        comp->retcode = 0;
+        //comp->complete(0);
+        if(comp->callback) comp->callback(comp, comp->callback_arg);
     }
     return r;
 }
