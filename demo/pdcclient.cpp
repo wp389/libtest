@@ -123,6 +123,7 @@ void* PdcClient::Finisherthreads::_process()
                 pdc->msglock.unlock();
                 pdc->msgcond.Signal();
                 break;
+            case OPEN_RBD_FINISH:
             case RW_W_FINISH:
             case RW_R_FINISH:
             case PDC_AIO_FLUSH_FINISH:
@@ -264,6 +265,13 @@ void* PdcClient::Msgthreads::_process()
                 assert(p_pipe);
                 r = p_pipe->push(msg);
                 break;
+            case OPEN_RBD_FINISH:
+				cerr << "get op OPEN_RBD_FINISH" << endl;
+                c = reinterpret_cast<PdcCompletion*>(msg->u.mgr.client.comp);
+                if (c) {
+                    c->complete(0);
+                }
+				break;
             case RW_W_FINISH:
                 //assert(prbd);
                 //cerr<<"write op:["<<msg->opid<<"] return:"<<msg->getreturnvalue()<<endl;

@@ -34,7 +34,9 @@ public:
         callback = cb;
         callback_arg = cb_arg;
     }
-    PdcCompletion():lock("PdcCompletion"),ref(1),done(false)
+    PdcCompletion():lock("PdcCompletion"),ref(1),done(false),
+        callback(NULL),
+        callback_arg(NULL)
     {}
     ~PdcCompletion() {}
     void setcb(pdc_callback_t cb, void *cb_arg){

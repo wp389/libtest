@@ -191,9 +191,12 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
     pdcPipe::PdcPipe<Msginfo>::ptr recvmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[RECVMQ]);
     pdcPipe::PdcPipe<Msginfo>::ptr sendmq = reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(prbd->mq[SENDMQ]);
     //msginfo will change to msgpool list  next step
+    PdcCompletion *comp = new PdcCompletion();
+    assert(comp);
     Msginfo *msg = new Msginfo();
     msg->opcode = OPEN_RBD;
-    
+
+    msg->u.mgr.client.comp = comp;
     strcpy(msg->u.mgr.client.cluster,"ceph");
     strcpy(msg->u.mgr.client.pool, prados->GetName());
     strcpy(msg->u.mgr.client.volume,rbd_name);
@@ -230,13 +233,26 @@ extern "C" int rbd_open(rados_ioctx_t ioctx, const char *rbd_name, rbd_image_t *
         if(r < 0) cerr<<"simple pipe open client recv failed"<<endl;
         */
     }
+    
+    cerr << "wait for singal..." << endl;
+    comp->wait_for_complete();
+    cerr << "wait for singal done" << endl;
+    if (0 == comp->get_return_value()) {
+        cerr << "server succeed to open rbd volume" << endl;
+        comp->release();
+    } else {
+        cerr << "server failed to open rbd volume" << endl;
+        comp->release();
+        //TODO,we should retry to open rbd
+    }
+	
     if(MULTIPIPE){
         Msginfo *msg = new Msginfo();
         msg->opcode = PDC_ADD_EPOLL;
         // in this model , maybe register vm in server thread-1, but
         // add_fd in thread-2,that can make some error for can't find volume
         // so here must sleep 1-2s in this version..
-        sleep(2);
+        //sleep(2);
         strcpy(msg->u.mgr.client.cluster,"ceph");
         strcpy(msg->u.mgr.client.pool, prados->GetName());
         strcpy(msg->u.mgr.client.volume,rbd_name);

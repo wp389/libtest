@@ -215,6 +215,7 @@ typedef enum {
     ACK_MEMORY,			//18
     RW_OP,
     MGR_OP,
+    OPEN_RBD_FINISH,
     RW_FINISH,
     RW_W_FINISH,		//22
     RW_R_FINISH,			//23
@@ -274,7 +275,7 @@ struct PdcClientInfo{
     
     u32 offset;
     u32 len;
-    
+    void *comp;
 };
 
 struct pipekey{

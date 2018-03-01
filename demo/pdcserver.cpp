@@ -684,9 +684,22 @@ void* Pdcserver::Msgthreads::_process()
             {
                 r = pdc->register_vm(client, msg);
                 if(r < 0){
+                    //TODO,when we failed to register vm,we shoule send OPEN_RBD_FAILED to client
                     cerr<<"register vm failed ret = "<<r <<endl;
+                    break;
                     //delete msg;
                     //continue;
+                }
+				cerr << "send op OPEN_RBD_FINISH to client" <<endl;
+                pdc->OpFindClient(msg);
+                vol = reinterpret_cast<CephBackend::RbdVolume *>(msg->volume);
+                pipe =reinterpret_cast<pdcPipe::PdcPipe<Msginfo>*>(vol->mq[SENDMQ]);
+                msg->opcode = OPEN_RBD_FINISH;                
+                assert(pipe);
+                r = pipe->push(msg);
+                if (r < 0) {
+                    msg->dump("push failed");
+                    cerr << "pipe push msg:" << msg->opid << " failed" <<endl;
                 }
                 break;
             }
